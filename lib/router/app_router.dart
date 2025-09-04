@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../views/pages/create_account_page.dart';
+import '../views/pages/email_sent_page.dart';
+import '../views/pages/forgot_password_page.dart';
 import '../views/pages/home_page.dart';
+import '../views/pages/login_page.dart';
 import '../views/pages/splash_page.dart';
+import '../views/pages/welcome_page.dart';
 
 class AppRoutes {
   AppRoutes._();
 
   static const String splash = '/';
+  static const String welcome = '/welcome';
+  static const String login = '/login';
+  static const String createAccount = '/create-account';
+  static const String forgotPassword = '/forgot-password';
+  static const String emailSent = '/email-sent';
   static const String home = '/home';
 }
 
@@ -21,6 +31,34 @@ class AppRouter {
         path: AppRoutes.splash,
         name: 'splash',
         pageBuilder: (context, state) => _noTransitionPage(const SplashPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.welcome,
+        name: 'welcome',
+        pageBuilder: (context, state) => _noTransitionPage(const WelcomePage()),
+      ),
+      GoRoute(
+        path: AppRoutes.login,
+        name: 'login',
+        pageBuilder: (context, state) => _noTransitionPage(const LoginPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.createAccount,
+        name: 'createAccount',
+        pageBuilder:
+            (context, state) => _noTransitionPage(const CreateAccountPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.forgotPassword,
+        name: 'forgotPassword',
+        pageBuilder:
+            (context, state) => _noTransitionPage(const ForgotPasswordPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.emailSent,
+        name: 'emailSent',
+        pageBuilder:
+            (context, state) => _noTransitionPage(const EmailSentPage()),
       ),
       GoRoute(
         path: AppRoutes.home,

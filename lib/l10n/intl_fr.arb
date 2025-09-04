@@ -1,8 +1,32 @@
 {
   "appName": "Akhira",
+  "welcomeTitle": "Bienvenue chez\nÉditions Akhira.",
+  "welcomeSubtitle": "Accédez à du contenu numérique exclusif pour vos livres, à tout moment et partout.",
+  "termsText": "Je confirme avoir lu et accepté l'ensemble des conditions générales.",
+  "startButton": "Commencer",
   "home": "Accueil",
   "languageEnglish": "Anglais",
-  "languageFrench": "Français"
+  "languageFrench": "Français",
+  "login": "Connexion",
+  "welcomeBack": "Bon retour!",
+  "welcomeMessage": "Bienvenue",
+  "emailPlaceholder": "Entrez votre email",
+  "passwordPlaceholder": "Entrez votre mot de passe",
+  "loginButton": "Se connecter",
+  "forgotAccount": "Mot de passe oublié",
+  "createAccount": "Créer un compte",
+  "createAccountTitle": "Créer un compte",
+  "fullNamePlaceholder": "Nom complet",
+  "createButton": "Créer",
+  "alreadyHaveAccount": "J'ai déjà un compte",
+  "forgotPasswordTitle": "Mot de passe oublié",
+  "forgotPasswordHeading": "Indiquez votre e-mail",
+  "forgotPasswordDescription": "Nous vous enverrons un lien par e-mail pour réinitialiser votre mot de passe.",
+  "emailIdPlaceholder": "Entrez votre identifiant email",
+  "confirmButton": "Confirmer",
+  "emailSentTitle": "Email envoyé avec succès",
+  "emailSentSubtitle": "Veuillez vérifier votre email",
+  "openEmailButton": "Ouvrir email"
 }
 
 

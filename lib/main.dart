@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'constants/app_constants.dart';
 import 'core/di/service_locator.dart';
+import 'core/language/language_manager.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
@@ -16,7 +17,6 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return ScreenUtilInit(
@@ -24,16 +24,24 @@ class MyApp extends StatelessWidget {
       minTextAdapt: true,
       builder: (context, child) {
         final appRouter = getIt<AppRouter>().router;
-        return MaterialApp.router(
-          title: AppConstants.appName,
-          theme: AppTheme.light(),
-          routerConfig: appRouter,
-          supportedLocales: const [Locale('en'), Locale('fr')],
-          localizationsDelegates: const [
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
+        final languageManager = getIt<LanguageManager>();
+
+        return AnimatedBuilder(
+          animation: languageManager,
+          builder: (context, child) {
+            return MaterialApp.router(
+              title: AppConstants.appName,
+              theme: AppTheme.light(),
+              routerConfig: appRouter,
+              locale: languageManager.getLocale(),
+              supportedLocales: const [Locale('en'), Locale('fr')],
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+            );
+          },
         );
       },
     );
