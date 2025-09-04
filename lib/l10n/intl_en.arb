@@ -26,7 +26,13 @@
   "confirmButton": "Confirm",
   "emailSentTitle": "Email sent successfully",
   "emailSentSubtitle": "Please check your email",
-  "openEmailButton": "Open email"
+  "openEmailButton": "Open email",
+  "homeQuote": "Une science qui vous accompagne pour l'eternite",
+  "emptyLibraryText": "Votre bibliothèque est vide",
+  "addFirstBookTitle": "Add your first book",
+  "enterBookCodePlaceholder": "Enter book code",
+  "verifyCodeButton": "Verify code",
+  "cancelButton": "Cancel"
 }
 
 
