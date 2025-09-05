@@ -39,40 +39,22 @@ class BookCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     placeholder:
                         (context, url) => Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.blue.shade800,
-                                Colors.blue.shade600,
-                              ],
-                            ),
-                          ),
+                          decoration: BoxDecoration(),
                           child: const Center(
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: Color(0xff0C1138),
                               strokeWidth: 2,
                             ),
                           ),
                         ),
                     errorWidget:
                         (context, url, error) => Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.blue.shade800,
-                                Colors.blue.shade600,
-                              ],
-                            ),
-                          ),
+                          decoration: BoxDecoration(),
                           child: const Center(
                             child: Icon(
                               Icons.book,
                               size: 40,
-                              color: Colors.white,
+                              color: Color(0xff0C1138),
                             ),
                           ),
                         ),

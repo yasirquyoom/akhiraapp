@@ -34,7 +34,13 @@
   "enterBookCodePlaceholder": "Enter book code",
   "verifyCodeButton": "Verify code",
   "cancelButton": "Cancel",
-  "myLibrary": "My Library"
+  "myLibrary": "My Library",
+  "bookDetails": "Book Details",
+  "ebook": "Digital book",
+  "audioBook": "Audio book",
+  "videos": "Videos",
+  "images": "Images",
+  "quiz": "Quiz"
 }
 
 

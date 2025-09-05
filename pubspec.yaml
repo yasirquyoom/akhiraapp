@@ -47,6 +47,9 @@ dependencies:
   equatable: ^2.0.5
   url_launcher: ^6.2.5
   cached_network_image: ^3.3.1
+  path_provider: ^2.1.2
+  permission_handler: ^11.3.1
+  image_gallery_saver: ^2.0.3
 
 dev_dependencies:
   flutter_test:

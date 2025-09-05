@@ -10,4 +10,11 @@ class AppAssets {
   static const String appTextLogo = 'assets/images/app_text_logo.png';
   static const String bookImage = 'assets/images/book_image.png';
   static const String homeTextImage = 'assets/images/home_text.png';
+
+  // Book Details Icons
+  static const String iconEbook = 'assets/images/ebook.png';
+  static const String iconAudio = 'assets/images/audios.png';
+  static const String iconVideo = 'assets/images/videos.png';
+  static const String iconImages = 'assets/images/images.png';
+  static const String iconQuiz = 'assets/images/quiz.png';
 }

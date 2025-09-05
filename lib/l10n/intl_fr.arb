@@ -34,7 +34,13 @@
   "enterBookCodePlaceholder": "Entrez le code du livre",
   "verifyCodeButton": "Vérifier le code",
   "cancelButton": "Annuler",
-  "myLibrary": "Ma Bibliothèque"
+  "myLibrary": "Ma Bibliothèque",
+  "bookDetails": "Détails du livre",
+  "ebook": "Livre numérique",
+  "audioBook": "Livre audio",
+  "videos": "Vidéos",
+  "images": "Images",
+  "quiz": "Quiz"
 }
 
 

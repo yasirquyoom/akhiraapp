@@ -231,7 +231,7 @@ class _HomePageState extends State<HomePage> {
               return BookCard(
                 book: books[index],
                 onTap: () {
-                  // TODO: Navigate to book details
+                  context.go(AppRoutes.bookDetails);
                 },
               );
             },

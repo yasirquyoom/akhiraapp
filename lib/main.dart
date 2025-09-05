@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'constants/app_constants.dart';
 import 'core/di/service_locator.dart';
 import 'core/language/language_manager.dart';
+import 'data/cubits/audio/audio_cubit.dart';
+import 'data/cubits/images/images_cubit.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
@@ -29,17 +32,27 @@ class MyApp extends StatelessWidget {
         return AnimatedBuilder(
           animation: languageManager,
           builder: (context, child) {
-            return MaterialApp.router(
-              title: AppConstants.appName,
-              theme: AppTheme.light(),
-              routerConfig: appRouter,
-              locale: languageManager.getLocale(),
-              supportedLocales: const [Locale('en'), Locale('fr')],
-              localizationsDelegates: const [
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
+            return MultiBlocProvider(
+              providers: [
+                BlocProvider<AudioCubit>(
+                  create: (context) => getIt<AudioCubit>(),
+                ),
+                BlocProvider<ImagesCubit>(
+                  create: (context) => getIt<ImagesCubit>(),
+                ),
               ],
+              child: MaterialApp.router(
+                title: AppConstants.appName,
+                theme: AppTheme.light(),
+                routerConfig: appRouter,
+                locale: languageManager.getLocale(),
+                supportedLocales: const [Locale('en'), Locale('fr')],
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+              ),
             );
           },
         );

@@ -1,15 +1,18 @@
+import 'package:akhira/views/pages/audio_fullscreen_page.dart';
+import 'package:akhira/views/pages/book_details_page.dart';
+import 'package:akhira/views/pages/splash_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/di/service_locator.dart';
 import '../data/cubits/home/home_cubit.dart';
+import '../views/pages/book_content_page.dart';
 import '../views/pages/create_account_page.dart';
 import '../views/pages/email_sent_page.dart';
 import '../views/pages/forgot_password_page.dart';
 import '../views/pages/home_page.dart';
 import '../views/pages/login_page.dart';
-import '../views/pages/splash_page.dart';
 import '../views/pages/welcome_page.dart';
 
 class AppRoutes {
@@ -22,6 +25,9 @@ class AppRoutes {
   static const String forgotPassword = '/forgot-password';
   static const String emailSent = '/email-sent';
   static const String home = '/home';
+  static const String bookDetails = '/book-details';
+  static const String bookContent = '/book-content';
+  static const String audioFullscreen = '/audio-fullscreen';
 }
 
 class AppRouter {
@@ -73,6 +79,27 @@ class AppRouter {
                 child: const HomePage(),
               ),
             ),
+      ),
+      GoRoute(
+        path: AppRoutes.bookDetails,
+        name: 'bookDetails',
+        pageBuilder:
+            (context, state) => _noTransitionPage(const BookDetailsPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.bookContent,
+        name: 'bookContent',
+        pageBuilder: (context, state) {
+          final tabIndex =
+              int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
+          return _noTransitionPage(BookContentPage(initialTabIndex: tabIndex));
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.audioFullscreen,
+        name: 'audioFullscreen',
+        pageBuilder:
+            (context, state) => _noTransitionPage(const AudioFullscreenPage()),
       ),
     ],
     errorBuilder: (context, state) {
