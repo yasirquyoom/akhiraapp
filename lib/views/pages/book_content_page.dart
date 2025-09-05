@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/app_colors.dart';
@@ -427,220 +426,39 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildImageGallery(ImagesLoaded state) {
-    return Stack(
-      children: [
-        // Main image with swipe functionality
-        GestureDetector(
-          onPanEnd: (details) {
-            if (details.velocity.pixelsPerSecond.dx > 300) {
-              // Swipe right - previous image
-              context.read<ImagesCubit>().previousImage();
-            } else if (details.velocity.pixelsPerSecond.dx < -300) {
-              // Swipe left - next image
-              context.read<ImagesCubit>().nextImage();
-            }
-          },
-          child: Container(
-            margin: EdgeInsets.only(
-              top: 10.h,
-              bottom: 40.h,
-              left: 20.w,
-              right: 20.w,
-            ),
-            width: double.infinity,
-            height: double.infinity,
-
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.all(Radius.circular(20.r)),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.all(Radius.circular(20.r)),
-              child: Image.network(
-                state.images[state.currentIndex].imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Icon(
-                        Icons.image_not_supported,
-                        size: 100,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  );
-                },
+    return ImageCardStack(
+      state: state,
+      onSwipeLeft: () => context.read<ImagesCubit>().nextImage(),
+      onSwipeRight: () => context.read<ImagesCubit>().previousImage(),
+      onDownload: () async {
+        try {
+          await context.read<ImagesCubit>().downloadImage(
+            state.images[state.currentIndex].imageUrl,
+          );
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Image downloaded successfully!'),
+                backgroundColor: Colors.green,
               ),
-            ),
-          ),
-        ),
-
-        // Bottom overlay with title and controls
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Download failed: $e'),
+                backgroundColor: Colors.red,
               ),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(20.r),
-                bottomRight: Radius.circular(20.r),
-              ),
-            ),
-            padding: EdgeInsets.all(20.w),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Image title
-                Text(
-                  state.images[state.currentIndex].title,
-                  style: TextStyle(
-                    fontFamily: 'SFPro',
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18.sp,
-                    color: Colors.white,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 16.h),
-
-                // Action buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    // Download button
-                    GestureDetector(
-                      onTap: () async {
-                        try {
-                          await context.read<ImagesCubit>().downloadImage(
-                            state.images[state.currentIndex].imageUrl,
-                          );
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Image downloaded successfully!'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Download failed: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      child: Container(
-                        width: 50.w,
-                        height: 50.w,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child:
-                            state.isDownloading
-                                ? const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                : Icon(
-                                  Icons.download,
-                                  color: Colors.white,
-                                  size: 24.sp,
-                                ),
-                      ),
-                    ),
-                    SizedBox(width: 12.w),
-
-                    // Share button
-                    GestureDetector(
-                      onTap: () {
-                        // TODO: Implement share functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Share functionality coming soon!'),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        width: 50.w,
-                        height: 50.w,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.share,
-                          color: Colors.white,
-                          size: 24.sp,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Next image preview (bottom right corner)
-        if (state.images.length > 1)
-          Positioned(
-            bottom: 20.h,
-            right: 20.w,
-            child: GestureDetector(
-              onTap: () => context.read<ImagesCubit>().nextImage(),
-              child: Container(
-                width: 80.w,
-                height: 80.w,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10.r),
-                  child: Image.network(
-                    state
-                        .images[(state.currentIndex + 1) % state.images.length]
-                        .imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey[300],
-                        child: const Icon(Icons.image, color: Colors.grey),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
+            );
+          }
+        }
+      },
+      onShare: () {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Share functionality coming soon!')),
+        );
+      },
     );
   }
 }

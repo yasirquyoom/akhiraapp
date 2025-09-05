@@ -8,12 +8,16 @@ class ImageCardStack extends StatefulWidget {
   final ImagesLoaded state;
   final VoidCallback? onSwipeLeft;
   final VoidCallback? onSwipeRight;
+  final VoidCallback? onDownload;
+  final VoidCallback? onShare;
 
   const ImageCardStack({
     super.key,
     required this.state,
     this.onSwipeLeft,
     this.onSwipeRight,
+    this.onDownload,
+    this.onShare,
   });
 
   @override
@@ -24,10 +28,10 @@ class _ImageCardStackState extends State<ImageCardStack>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _animation;
-  
+
   double _dragDistance = 0.0;
   bool _isDragging = false;
-  
+
   @override
   void initState() {
     super.initState();
@@ -61,11 +65,11 @@ class _ImageCardStackState extends State<ImageCardStack>
       },
       onPanEnd: (details) {
         _isDragging = false;
-        
+
         // Determine swipe direction and velocity
         final velocity = details.velocity.pixelsPerSecond.dx;
         final dragThreshold = 100.0;
-        
+
         if (_dragDistance.abs() > dragThreshold || velocity.abs() > 500) {
           if (_dragDistance > 0 || velocity > 0) {
             // Swipe right - previous image
@@ -75,7 +79,7 @@ class _ImageCardStackState extends State<ImageCardStack>
             widget.onSwipeLeft?.call();
           }
         }
-        
+
         // Reset drag distance
         setState(() {
           _dragDistance = 0.0;
@@ -88,7 +92,7 @@ class _ImageCardStackState extends State<ImageCardStack>
           children: [
             // Background cards (stacked behind)
             ..._buildBackgroundCards(),
-            
+
             // Main card (on top)
             _buildMainCard(),
           ],
@@ -100,12 +104,13 @@ class _ImageCardStackState extends State<ImageCardStack>
   List<Widget> _buildBackgroundCards() {
     final cards = <Widget>[];
     final maxBackgroundCards = math.min(3, widget.state.images.length - 1);
-    
+
     for (int i = 1; i <= maxBackgroundCards; i++) {
-      final cardIndex = (widget.state.currentIndex + i) % widget.state.images.length;
+      final cardIndex =
+          (widget.state.currentIndex + i) % widget.state.images.length;
       final scale = 1.0 - (i * 0.05); // Each card is 5% smaller
       final offset = i * 8.0; // Each card is offset by 8px
-      
+
       cards.add(
         Positioned(
           top: offset,
@@ -122,7 +127,7 @@ class _ImageCardStackState extends State<ImageCardStack>
         ),
       );
     }
-    
+
     return cards.reversed.toList(); // Reverse to show cards in correct order
   }
 
@@ -130,7 +135,7 @@ class _ImageCardStackState extends State<ImageCardStack>
     final currentImage = widget.state.images[widget.state.currentIndex];
     final rotation = _dragDistance * 0.001; // Convert drag distance to rotation
     final opacity = math.max(0.0, 1.0 - (_dragDistance.abs() * 0.002));
-    
+
     return AnimatedBuilder(
       animation: _animation,
       builder: (context, child) {
@@ -138,10 +143,7 @@ class _ImageCardStackState extends State<ImageCardStack>
           offset: Offset(_dragDistance, 0),
           child: Transform.rotate(
             angle: rotation,
-            child: Opacity(
-              opacity: opacity,
-              child: _buildCard(currentImage),
-            ),
+            child: Opacity(opacity: opacity, child: _buildCard(currentImage)),
           ),
         );
       },
@@ -150,12 +152,7 @@ class _ImageCardStackState extends State<ImageCardStack>
 
   Widget _buildCard(ImageModel image, {double opacity = 1.0}) {
     return Container(
-      margin: EdgeInsets.only(
-        top: 10.h,
-        bottom: 40.h,
-        left: 20.w,
-        right: 20.w,
-      ),
+      margin: EdgeInsets.only(top: 10.h, bottom: 40.h, left: 20.w, right: 20.w),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.all(Radius.circular(20.r)),
         boxShadow: [
@@ -189,7 +186,7 @@ class _ImageCardStackState extends State<ImageCardStack>
                 );
               },
             ),
-            
+
             // Bottom overlay
             Positioned(
               bottom: 0,
@@ -226,7 +223,7 @@ class _ImageCardStackState extends State<ImageCardStack>
                       textAlign: TextAlign.center,
                     ),
                     SizedBox(height: 16.h),
-                    
+
                     // Action buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -234,19 +231,15 @@ class _ImageCardStackState extends State<ImageCardStack>
                         // Download button
                         _buildActionButton(
                           icon: Icons.download,
-                          onTap: () {
-                            // Download functionality will be handled by parent
-                          },
+                          onTap: widget.onDownload ?? () {},
                           opacity: opacity,
                         ),
                         SizedBox(width: 12.w),
-                        
+
                         // Share button
                         _buildActionButton(
                           icon: Icons.share,
-                          onTap: () {
-                            // Share functionality will be handled by parent
-                          },
+                          onTap: widget.onShare ?? () {},
                           opacity: opacity,
                         ),
                       ],
