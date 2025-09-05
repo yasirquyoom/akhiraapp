@@ -30,9 +30,11 @@
   "homeQuote": "Une science qui vous accompagne pour l'eternite",
   "emptyLibraryText": "Votre bibliothèque est vide",
   "addFirstBookTitle": "Ajoutez votre premier livre",
+  "addAnotherBookTitle": "Ajouter un autre livre",
   "enterBookCodePlaceholder": "Entrez le code du livre",
   "verifyCodeButton": "Vérifier le code",
-  "cancelButton": "Annuler"
+  "cancelButton": "Annuler",
+  "myLibrary": "Ma Bibliothèque"
 }
 
 

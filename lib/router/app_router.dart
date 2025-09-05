@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/di/service_locator.dart';
+import '../data/cubits/home/home_cubit.dart';
 import '../views/pages/create_account_page.dart';
 import '../views/pages/email_sent_page.dart';
 import '../views/pages/forgot_password_page.dart';
@@ -63,7 +66,13 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
-        pageBuilder: (context, state) => _noTransitionPage(const HomePage()),
+        pageBuilder:
+            (context, state) => _noTransitionPage(
+              BlocProvider(
+                create: (context) => getIt<HomeCubit>(),
+                child: const HomePage(),
+              ),
+            ),
       ),
     ],
     errorBuilder: (context, state) {
