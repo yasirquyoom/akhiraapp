@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/app_colors.dart';
@@ -7,6 +8,7 @@ import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
 import '../../data/cubits/audio/audio_cubit.dart';
 import '../../data/cubits/images/images_cubit.dart';
+import '../../data/cubits/quiz/quiz_cubit.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
 import '../../widgets/image_card_stack.dart';
@@ -410,7 +412,340 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildQuizTab() {
-    return const Center(child: Text('Quiz Content - Coming Soon'));
+    return BlocBuilder<QuizCubit, QuizState>(
+      builder: (context, state) {
+        if (state is QuizLoaded) {
+          return _buildQuizContent(state);
+        } else if (state is QuizCompleted) {
+          return _buildQuizCompleted(state);
+        }
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+
+  Widget _buildQuizContent(QuizLoaded state) {
+    return Stack(
+      children: [
+        // Main quiz content
+        SingleChildScrollView(
+          padding: EdgeInsets.all(20.w),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Score and Progress Card
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(30.w),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [AppColors.primary, AppColors.primaryGradientEnd],
+                  ),
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Row(
+                  children: [
+                    // Score
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            '${state.correctAnswers}',
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 32.sp,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            _languageManager.getText('My score', 'Mon score'),
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14.sp,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Divider
+                    Container(
+                      width: 5,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                    ),
+                    // Question Progress
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            '${state.currentQuestionIndex + 1}/${state.totalQuestions}',
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 32.sp,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            _languageManager.getText('Questions', 'Questions'),
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14.sp,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 24.h),
+
+              // Question
+              Text(
+                state.currentQuestion.question,
+                style: TextStyle(
+                  fontFamily: 'SFPro',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18.sp,
+                  color: Colors.black,
+                ),
+              ),
+
+              SizedBox(height: 24.h),
+
+              // Options
+              ...state.currentQuestion.options.map(
+                (option) => _buildQuizOption(
+                  option,
+                  state.selectedOptionId == option.id,
+                ),
+              ),
+
+              SizedBox(height: 24.h),
+
+              // Navigation Buttons Row
+              Row(
+                children: [
+                  // Back Button (only show for questions 2-5)
+                  if (!state.isFirstQuestion) ...[
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed:
+                            () => context.read<QuizCubit>().previousQuestion(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.shade100,
+                          foregroundColor: Colors.grey.shade700,
+                          padding: EdgeInsets.symmetric(vertical: 16.h),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                            side: BorderSide(color: Colors.grey.shade300),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _languageManager.getText('Back', 'Retour'),
+                              style: TextStyle(
+                                fontFamily: 'SFPro',
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                  ],
+
+                  // Next/Submit Button
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed:
+                          state.selectedOptionId != null
+                              ? () {
+                                context.read<QuizCubit>().submitAnswer();
+                                context.read<QuizCubit>().nextQuestion();
+                              }
+                              : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            state.selectedOptionId != null
+                                ? AppColors.primary
+                                : Colors.grey.shade300,
+                        padding: EdgeInsets.symmetric(vertical: 16.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            state.isLastQuestion
+                                ? _languageManager.getText('Submit', 'Envoyer')
+                                : _languageManager.getText('Next', 'Suivant'),
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16.sp,
+                              color:
+                                  state.selectedOptionId != null
+                                      ? Colors.white
+                                      : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQuizOption(QuizOption option, bool isSelected) {
+    return GestureDetector(
+      onTap: () => context.read<QuizCubit>().selectOption(option.id),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 20.h),
+        child: Row(
+          children: [
+            // Option Letter Circle
+            Container(
+              width: 50.w,
+              height: 50.w,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primary, AppColors.primaryGradientEnd],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  option.letter,
+                  style: TextStyle(
+                    fontFamily: 'SFPro',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16.sp,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+
+            SizedBox(width: 16.w),
+
+            // Option Text
+            Expanded(
+              child: Text(
+                option.text,
+                style: TextStyle(
+                  fontFamily: 'SFPro',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16.sp,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+
+            // Radio Button
+            Container(
+              width: 24.w,
+              height: 24.w,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : Colors.grey.shade400,
+                  width: 2,
+                ),
+                color: isSelected ? AppColors.primary : Colors.transparent,
+              ),
+              child:
+                  isSelected
+                      ? Icon(Icons.check, color: Colors.white, size: 16.sp)
+                      : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuizCompleted(QuizCompleted state) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(20.w),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _languageManager.getText('Quiz Completed!', 'Quiz Terminé!'),
+              style: TextStyle(
+                fontFamily: 'SFPro',
+                fontWeight: FontWeight.w700,
+                fontSize: 24.sp,
+                color: Colors.black,
+              ),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              _languageManager.getText(
+                'Your score: ${state.score}/${state.totalQuestions}',
+                'Votre score: ${state.score}/${state.totalQuestions}',
+              ),
+              style: TextStyle(
+                fontFamily: 'SFPro',
+                fontWeight: FontWeight.w500,
+                fontSize: 18.sp,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            SizedBox(height: 32.h),
+            ElevatedButton(
+              onPressed: () => context.read<QuizCubit>().restartQuiz(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 16.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+              child: Text(
+                _languageManager.getText('Restart', 'Recommencer'),
+                style: TextStyle(
+                  fontFamily: 'SFPro',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16.sp,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildVideosTab() {

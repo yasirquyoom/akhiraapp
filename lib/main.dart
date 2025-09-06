@@ -8,6 +8,7 @@ import 'core/di/service_locator.dart';
 import 'core/language/language_manager.dart';
 import 'data/cubits/audio/audio_cubit.dart';
 import 'data/cubits/images/images_cubit.dart';
+import 'data/cubits/quiz/quiz_cubit.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';
 
@@ -39,6 +40,9 @@ class MyApp extends StatelessWidget {
                 ),
                 BlocProvider<ImagesCubit>(
                   create: (context) => getIt<ImagesCubit>(),
+                ),
+                BlocProvider<QuizCubit>(
+                  create: (context) => getIt<QuizCubit>(),
                 ),
               ],
               child: MaterialApp.router(

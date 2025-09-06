@@ -1,3 +1,4 @@
+import 'package:akhira/widgets/width_spacer.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -203,15 +204,39 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         ),
         const HeightSpacer(16),
         // Third Row - 1 centered item
-        Center(
-          child: SizedBox(
-            width: MediaQuery.of(context).size.width * 0.5,
-            child: _buildContentCard(
-              icon: AppAssets.iconImages,
-              title: _languageManager.getText('Images', 'Images'),
-              onTap: () {
-                context.push('${AppRoutes.bookContent}?tab=4');
-              },
+        GestureDetector(
+          onTap: () {
+            context.push('${AppRoutes.bookContent}?tab=4');
+          },
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(AppAssets.iconImages, scale: 4),
+                const WidthSpacer(16),
+                Text(
+                  _languageManager.getText('Images', 'Images'),
+                  style: const TextStyle(
+                    fontFamily: 'SFPro',
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: Colors.black,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
           ),
         ),
