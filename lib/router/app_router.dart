@@ -1,12 +1,14 @@
 import 'package:akhira/views/pages/audio_fullscreen_page.dart';
 import 'package:akhira/views/pages/book_details_page.dart';
 import 'package:akhira/views/pages/splash_page.dart';
+import 'package:akhira/views/pages/video_fullscreen_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/di/service_locator.dart';
 import '../data/cubits/home/home_cubit.dart';
+import '../data/models/video_model.dart';
 import '../views/pages/book_content_page.dart';
 import '../views/pages/create_account_page.dart';
 import '../views/pages/email_sent_page.dart';
@@ -28,6 +30,7 @@ class AppRoutes {
   static const String bookDetails = '/book-details';
   static const String bookContent = '/book-content';
   static const String audioFullscreen = '/audio-fullscreen';
+  static const String videoFullscreen = '/video-fullscreen';
 }
 
 class AppRouter {
@@ -100,6 +103,27 @@ class AppRouter {
         name: 'audioFullscreen',
         pageBuilder:
             (context, state) => _noTransitionPage(const AudioFullscreenPage()),
+      ),
+      GoRoute(
+        path: AppRoutes.videoFullscreen,
+        name: 'videoFullscreen',
+        pageBuilder: (context, state) {
+          // For now, we'll pass a dummy video. In a real app, you'd fetch the video by ID
+          return _noTransitionPage(
+            VideoFullscreenPage(
+              video: const VideoModel(
+                id: '1',
+                title: 'Sample Video',
+                thumbnailUrl:
+                    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=400&h=225&fit=crop',
+                videoUrl:
+                    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+                duration: '02:30',
+                description: 'Sample video description',
+              ),
+            ),
+          );
+        },
       ),
     ],
     errorBuilder: (context, state) {

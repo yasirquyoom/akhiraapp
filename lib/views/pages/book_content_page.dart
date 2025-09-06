@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
@@ -9,6 +10,8 @@ import '../../core/language/language_manager.dart';
 import '../../data/cubits/audio/audio_cubit.dart';
 import '../../data/cubits/images/images_cubit.dart';
 import '../../data/cubits/quiz/quiz_cubit.dart';
+import '../../data/cubits/videos/videos_cubit.dart';
+import '../../data/models/video_model.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
 import '../../widgets/image_card_stack.dart';
@@ -749,7 +752,161 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildVideosTab() {
-    return const Center(child: Text('Video Player - Coming Soon'));
+    return BlocBuilder<VideosCubit, VideosState>(
+      builder: (context, state) {
+        if (state is VideosLoaded) {
+          return _buildVideoList(state);
+        }
+        return const Center(child: CircularProgressIndicator());
+      },
+    );
+  }
+
+  Widget _buildVideoList(VideosLoaded state) {
+    return ListView.builder(
+      padding: EdgeInsets.all(20.w),
+      itemCount: state.videos.length,
+      itemBuilder: (context, index) {
+        final video = state.videos[index];
+        return _buildVideoCard(video);
+      },
+    );
+  }
+
+  Widget _buildVideoCard(VideoModel video) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 16.h),
+      child: GestureDetector(
+        onTap: () {
+          // Navigate to fullscreen video player
+          context.go('${AppRoutes.videoFullscreen}?videoId=${video.id}');
+        },
+        child: Container(
+          height: 200.h,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12.r),
+            child: Stack(
+              children: [
+                // Thumbnail Image
+                Positioned.fill(
+                  child: CachedNetworkImage(
+                    imageUrl: video.thumbnailUrl,
+                    fit: BoxFit.cover,
+                    placeholder:
+                        (context, url) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                    errorWidget:
+                        (context, url, error) => Container(
+                          color: Colors.grey.shade200,
+                          child: const Icon(Icons.error, color: Colors.grey),
+                        ),
+                  ),
+                ),
+
+                // Play Button Overlay
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.3),
+                          Colors.black.withOpacity(0.1),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 60.w,
+                        height: 60.w,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.play_arrow,
+                          color: Colors.white,
+                          size: 32.sp,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Video Info
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: EdgeInsets.all(16.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.8),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          video.title,
+                          style: TextStyle(
+                            fontFamily: 'SFPro',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16.sp,
+                            color: Colors.white,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          video.duration,
+                          style: TextStyle(
+                            fontFamily: 'SFPro',
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14.sp,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildImagesTab() {
