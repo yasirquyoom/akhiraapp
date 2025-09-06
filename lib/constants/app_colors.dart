@@ -9,7 +9,7 @@ class AppColors {
   static const Color primaryGradientEnd = Color(0xFF4D78FF); // #4D78FF
 
   // UI
-  static const Color tabActiveBg = Color(0xFFFED455); // #FED455
+  static const Color tabActiveBg = Color(0xff2E4FB6); // #FED455
 
   // Neutrals
   static const Color black = Colors.black;

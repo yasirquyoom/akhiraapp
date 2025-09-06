@@ -108,8 +108,10 @@ class _ImageCardStackState extends State<ImageCardStack>
     for (int i = 1; i <= maxBackgroundCards; i++) {
       final cardIndex =
           (widget.state.currentIndex + i) % widget.state.images.length;
-      final scale = 1.0 - (i * 0.05); // Each card is 5% smaller
-      final offset = i * 8.0; // Each card is offset by 8px
+      final scale =
+          1.0 - (i * 0.02); // Each card is 2% smaller (reduced from 3%)
+      final offset =
+          i * 20.0; // Each card is offset by 20px (increased from 12px)
 
       cards.add(
         Positioned(
@@ -121,7 +123,8 @@ class _ImageCardStackState extends State<ImageCardStack>
             scale: scale,
             child: _buildCard(
               widget.state.images[cardIndex],
-              opacity: 0.8 - (i * 0.2), // Each card is more transparent
+              opacity: 0.7 - (i * 0.1), // Much more visible opacity
+              isBackground: true,
             ),
           ),
         ),
@@ -150,11 +153,20 @@ class _ImageCardStackState extends State<ImageCardStack>
     );
   }
 
-  Widget _buildCard(ImageModel image, {double opacity = 1.0}) {
+  Widget _buildCard(
+    ImageModel image, {
+    double opacity = 1.0,
+    bool isBackground = false,
+  }) {
     return Container(
       margin: EdgeInsets.only(top: 10.h, bottom: 40.h, left: 20.w, right: 20.w),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.all(Radius.circular(20.r)),
+        color: isBackground ? Colors.white.withOpacity(0.1) : null,
+        border:
+            isBackground
+                ? Border.all(color: Colors.white.withOpacity(0.6), width: 2.0)
+                : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.3),

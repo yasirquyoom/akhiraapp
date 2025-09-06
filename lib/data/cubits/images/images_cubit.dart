@@ -69,35 +69,35 @@ class ImagesCubit extends Cubit<ImagesState> {
         id: '1',
         title: 'Le titre de l\'image ira ici',
         imageUrl:
-            'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=800&h=1200&fit=crop',
+            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcREKWN8bJT4u9JQunIM9X0V7ecwkUMiI0uXUg&usqp=CAU',
         description: 'Beautiful mosque architecture',
       ),
       const ImageModel(
         id: '2',
         title: 'Architecture Details',
         imageUrl:
-            'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=800&h=1200&fit=crop',
+            'https://c8.alamy.com/comp/E9E9TK/quran-the-holy-book-of-islam-E9E9TK.jpg',
         description: 'Intricate architectural patterns',
       ),
       const ImageModel(
         id: '3',
         title: 'Historical Monument',
         imageUrl:
-            'https://images.unsplash.com/photo-1587474260584-136574528ed5?w=800&h=1200&fit=crop',
+            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
         description: 'Ancient historical structure',
       ),
       const ImageModel(
         id: '4',
         title: 'Cultural Heritage',
         imageUrl:
-            'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=1200&fit=crop',
+            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQSrbYNa8ittD3pTgeBc3UZ525hGa0KRKfBYw&usqp=CAU',
         description: 'Traditional cultural elements',
       ),
       const ImageModel(
         id: '5',
         title: 'Modern Architecture',
         imageUrl:
-            'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=800&h=1200&fit=crop',
+            '	https://c1.wallpaperflare.com/preview/122/762/486/kaaba-house-of-allah-muslim-islamic.jpg',
         description: 'Contemporary design elements',
       ),
     ];

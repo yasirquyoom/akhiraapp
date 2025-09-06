@@ -176,7 +176,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20.r),
                       child: Image.network(
-                        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop',
+                        'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
                           return Container(

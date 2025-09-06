@@ -87,13 +87,16 @@ class _BookContentPageState extends State<BookContentPage>
           preferredSize: const Size.fromHeight(48),
           child: TabBar(
             controller: _tabController,
+
+            tabAlignment: TabAlignment.center,
             isScrollable: true,
             indicatorSize: TabBarIndicatorSize.label,
+            indicatorPadding: EdgeInsets.symmetric(vertical: 4),
             indicator: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(30),
               color: AppColors.tabActiveBg,
             ),
-            labelColor: Colors.black,
+            labelColor: Colors.white,
             unselectedLabelColor: Colors.grey,
             labelStyle: const TextStyle(
               fontFamily: 'SFPro',
@@ -239,7 +242,7 @@ class _BookContentPageState extends State<BookContentPage>
               borderRadius: BorderRadius.circular(8),
               image: const DecorationImage(
                 image: NetworkImage(
-                  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
+                  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
                 ),
                 fit: BoxFit.cover,
               ),
@@ -291,7 +294,7 @@ class _BookContentPageState extends State<BookContentPage>
               ),
               child: Icon(
                 isCurrentlyPlaying ? Icons.pause : Icons.play_arrow,
-                color: Colors.black,
+                color: Colors.white,
                 size: 24,
               ),
             ),
@@ -333,7 +336,7 @@ class _BookContentPageState extends State<BookContentPage>
                 borderRadius: BorderRadius.circular(8),
                 image: const DecorationImage(
                   image: NetworkImage(
-                    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
+                    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
                   ),
                   fit: BoxFit.cover,
                 ),

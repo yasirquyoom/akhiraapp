@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/app_assets.dart';
-import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
 import '../../router/app_router.dart';
@@ -45,7 +44,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
+          onPressed: () => context.go(AppRoutes.home),
         ),
         title: Text(
           'Patrick Ness',
@@ -90,7 +89,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                           borderRadius: BorderRadius.circular(12),
                           image: const DecorationImage(
                             image: NetworkImage(
-                              'https://m.media-amazon.com/images/I/811t1pfIZXL._UF1000,1000_QL80_.jpg',
+                              'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
                             ),
                             fit: BoxFit.cover,
                           ),

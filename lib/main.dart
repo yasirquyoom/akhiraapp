@@ -42,6 +42,7 @@ class MyApp extends StatelessWidget {
                 ),
               ],
               child: MaterialApp.router(
+                debugShowCheckedModeBanner: false,
                 title: AppConstants.appName,
                 theme: AppTheme.light(),
                 routerConfig: appRouter,
