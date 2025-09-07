@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import '../../data/cubits/audio/audio_cubit.dart';
 import '../../data/cubits/home/home_cubit.dart';
 import '../../data/cubits/images/images_cubit.dart';
+import '../../data/cubits/pdf/pdf_cubit.dart';
 import '../../data/cubits/quiz/quiz_cubit.dart';
 import '../../data/cubits/videos/videos_cubit.dart';
 import '../../data/helper/dio_client.dart';
@@ -33,6 +34,7 @@ Future<void> setupServiceLocator() async {
   getIt.registerFactory<HomeCubit>(() => HomeCubit());
   getIt.registerLazySingleton<AudioCubit>(() => AudioCubit());
   getIt.registerLazySingleton<ImagesCubit>(() => ImagesCubit());
+  getIt.registerLazySingleton<PdfCubit>(() => PdfCubit());
   getIt.registerFactory<QuizCubit>(() => QuizCubit());
   getIt.registerLazySingleton<VideosCubit>(() => VideosCubit());
 

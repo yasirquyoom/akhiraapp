@@ -8,6 +8,7 @@ import 'core/di/service_locator.dart';
 import 'core/language/language_manager.dart';
 import 'data/cubits/audio/audio_cubit.dart';
 import 'data/cubits/images/images_cubit.dart';
+import 'data/cubits/pdf/pdf_cubit.dart';
 import 'data/cubits/quiz/quiz_cubit.dart';
 import 'data/cubits/videos/videos_cubit.dart';
 import 'router/app_router.dart';
@@ -42,6 +43,7 @@ class MyApp extends StatelessWidget {
                 BlocProvider<ImagesCubit>(
                   create: (context) => getIt<ImagesCubit>(),
                 ),
+                BlocProvider<PdfCubit>(create: (context) => getIt<PdfCubit>()),
                 BlocProvider<QuizCubit>(
                   create: (context) => getIt<QuizCubit>(),
                 ),

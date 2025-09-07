@@ -1,5 +1,6 @@
 import 'package:akhira/views/pages/audio_fullscreen_page.dart';
 import 'package:akhira/views/pages/book_details_page.dart';
+import 'package:akhira/views/pages/pdf_viewer_page.dart';
 import 'package:akhira/views/pages/splash_page.dart';
 import 'package:akhira/views/pages/video_fullscreen_page.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/di/service_locator.dart';
 import '../data/cubits/home/home_cubit.dart';
+import '../data/models/pdf_model.dart';
 import '../data/models/video_model.dart';
 import '../views/pages/book_content_page.dart';
 import '../views/pages/create_account_page.dart';
@@ -31,6 +33,7 @@ class AppRoutes {
   static const String bookContent = '/book-content';
   static const String audioFullscreen = '/audio-fullscreen';
   static const String videoFullscreen = '/video-fullscreen';
+  static const String pdfViewer = '/pdf-viewer';
 }
 
 class AppRouter {
@@ -120,6 +123,29 @@ class AppRouter {
                     'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
                 duration: '02:30',
                 description: 'Sample video description',
+              ),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.pdfViewer,
+        name: 'pdfViewer',
+        pageBuilder: (context, state) {
+          // For now, we'll pass a dummy PDF. In a real app, you'd fetch the PDF by ID
+          return _noTransitionPage(
+            PdfViewerPage(
+              pdf: const PdfModel(
+                id: '1',
+                title: 'Introduction to Islamic Studies',
+                pdfUrl:
+                    'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+                thumbnailUrl:
+                    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&h=400&fit=crop',
+                description:
+                    'A comprehensive guide to Islamic studies covering fundamental concepts, history, and practices.',
+                totalPages: 25,
+                author: 'Dr. Ahmed Hassan',
               ),
             ),
           );

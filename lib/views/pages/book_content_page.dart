@@ -9,8 +9,10 @@ import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
 import '../../data/cubits/audio/audio_cubit.dart';
 import '../../data/cubits/images/images_cubit.dart';
+import '../../data/cubits/pdf/pdf_cubit.dart';
 import '../../data/cubits/quiz/quiz_cubit.dart';
 import '../../data/cubits/videos/videos_cubit.dart';
+import '../../data/models/pdf_model.dart';
 import '../../data/models/video_model.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
@@ -72,7 +74,10 @@ class _BookContentPageState extends State<BookContentPage>
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            // Navigate back to the book details page
+            context.go(AppRoutes.bookDetails);
+          },
         ),
         title: Text(
           'Patrick Ness',
@@ -190,7 +195,244 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildDigitalBookTab() {
-    return const Center(child: Text('PDF Content - Coming Soon'));
+    return BlocBuilder<PdfCubit, PdfState>(
+      builder: (context, state) {
+        if (state is PdfLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is PdfLoaded) {
+          return _buildPdfCard(state.pdf);
+        } else if (state is PdfError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64.sp, color: Colors.grey),
+                SizedBox(height: 16.h),
+                Text(
+                  'Error loading PDF',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  state.message,
+                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 24.h),
+                ElevatedButton(
+                  onPressed: () => context.read<PdfCubit>().reloadPdf(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('Retry', style: TextStyle(fontSize: 16.sp)),
+                ),
+              ],
+            ),
+          );
+        }
+        return const Center(child: Text('No PDF available'));
+      },
+    );
+  }
+
+  Widget _buildPdfCard(PdfModel pdf) {
+    return Padding(
+      padding: EdgeInsets.all(AppConstants.defaultPadding),
+      child: Column(
+        children: [
+          // PDF Preview Card
+          GestureDetector(
+            onTap: () => context.go(AppRoutes.pdfViewer),
+            child: Container(
+              width: double.infinity,
+              height: 400.h,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  children: [
+                    // PDF Thumbnail
+                    CachedNetworkImage(
+                      imageUrl: pdf.thumbnailUrl,
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder:
+                          (context, url) => Container(
+                            color: Colors.grey[200],
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                      errorWidget:
+                          (context, url, error) => Container(
+                            color: Colors.grey[200],
+                            child: Icon(
+                              Icons.picture_as_pdf,
+                              size: 64.sp,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                    ),
+                    // Overlay with PDF icon
+                    Positioned(
+                      top: 16.h,
+                      right: 16.w,
+                      child: Container(
+                        padding: EdgeInsets.all(8.w),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.picture_as_pdf,
+                          color: Colors.white,
+                          size: 24.sp,
+                        ),
+                      ),
+                    ),
+                    // Bottom overlay with PDF info
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: EdgeInsets.all(16.w),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.8),
+                            ],
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pdf.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              'By ${pdf.author}',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14.sp,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.pages,
+                                  color: Colors.white70,
+                                  size: 16.sp,
+                                ),
+                                SizedBox(width: 4.w),
+                                Text(
+                                  '${pdf.totalPages} pages',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                    vertical: 6.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    'Read Now',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          SizedBox(height: 24.h),
+          // PDF Description
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(16.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  pdf.description,
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildAudioTab() {
