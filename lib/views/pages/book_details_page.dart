@@ -7,6 +7,8 @@ import '../../constants/app_assets.dart';
 import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
 import '../../data/cubits/book/book_state.dart';
+import '../../data/cubits/home/home_cubit.dart';
+import '../../data/cubits/home/home_state.dart';
 import '../../data/models/book_model.dart';
 import '../../router/app_router.dart';
 import '../../widgets/height_spacer.dart';
@@ -49,119 +51,154 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     setState(() {});
   }
 
+  BookModel? _getBookFromState(BookState state) {
+    if (state is BookLoaded) {
+      // Try to get book from HomeCubit state
+      final homeCubit = context.read<HomeCubit>();
+      if (homeCubit.state is HomeLoaded) {
+        final homeState = homeCubit.state as HomeLoaded;
+        final bookId = state.bookId;
+        try {
+          return homeState.books.firstWhere(
+            (book) => book.id == bookId,
+          );
+        } catch (e) {
+          // If book not found in home state, create a basic book model
+          return BookModel(
+            id: bookId,
+            title: state.bookTitle ?? 'Unknown Book',
+            author: 'Unknown',
+            editionName: 'Unknown',
+            totalPages: 0,
+            coverImageUrl: '',
+          );
+        }
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => context.go(AppRoutes.home),
-        ),
-        title: Text(
-          widget.book?.title ?? 'Book Details',
-          style: const TextStyle(
-            fontFamily: 'SFPro',
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-            color: Colors.black,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          LanguageToggle(languageManager: _languageManager),
-          const SizedBox(width: 16),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(AppConstants.defaultPadding),
-          child: Column(
-            children: [
-              // Book Information Card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFF2E4FB6), Color(0xff142350)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    // Book Cover
-                    Expanded(
-                      flex: 2,
-                      child: Container(
-                        height: 200,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          image:
-                              widget.book?.coverImageUrl != null
-                                  ? DecorationImage(
-                                    image: NetworkImage(
-                                      widget.book!.coverImageUrl,
-                                    ),
-                                    fit: BoxFit.cover,
-                                  )
-                                  : const DecorationImage(
-                                    image: NetworkImage(
-                                      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
-                                    ),
-                                    fit: BoxFit.cover,
-                                  ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    // Book Details
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.book?.title ?? 'Unknown Book',
-                            style: const TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 24,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const HeightSpacer(16),
-                          _buildBookDetail(
-                            'Author',
-                            widget.book?.author ?? 'Unknown',
-                          ),
-                          const HeightSpacer(8),
-                          _buildBookDetail(
-                            'Edition',
-                            widget.book?.editionName ?? 'Unknown',
-                          ),
-                          const HeightSpacer(8),
-                          _buildBookDetail(
-                            'Pages',
-                            widget.book?.totalPages?.toString() ?? 'Unknown',
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+    return BlocBuilder<BookCubit, BookState>(
+      builder: (context, state) {
+        // Get book data from widget or global state
+        final book = widget.book ?? _getBookFromState(state);
+        final bookTitle = book?.title ?? (state is BookLoaded ? state.bookTitle : null);
+        
+        return Scaffold(
+          backgroundColor: Colors.grey.shade100,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => context.go(AppRoutes.home),
+            ),
+            title: Text(
+              bookTitle ?? 'Book Details',
+              style: const TextStyle(
+                fontFamily: 'SFPro',
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                color: Colors.black,
               ),
-              const HeightSpacer(32),
-              // Content Options Grid
-              _buildContentGrid(),
+            ),
+            centerTitle: true,
+            actions: [
+              LanguageToggle(languageManager: _languageManager),
+              const SizedBox(width: 16),
             ],
           ),
-        ),
-      ),
+          body: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(AppConstants.defaultPadding),
+              child: Column(
+                children: [
+                  // Book Information Card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Color(0xFF2E4FB6), Color(0xff142350)],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      children: [
+                        // Book Cover
+                        Expanded(
+                          flex: 2,
+                          child: Container(
+                            height: 200,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              image:
+                                  book?.coverImageUrl != null
+                                      ? DecorationImage(
+                                        image: NetworkImage(
+                                          book!.coverImageUrl,
+                                        ),
+                                        fit: BoxFit.cover,
+                                      )
+                                      : const DecorationImage(
+                                        image: NetworkImage(
+                                          'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
+                                        ),
+                                        fit: BoxFit.cover,
+                                      ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 20),
+                        // Book Details
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                book?.title ?? bookTitle ?? 'Unknown Book',
+                                style: const TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 24,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const HeightSpacer(16),
+                              _buildBookDetail(
+                                'Author',
+                                book?.author ?? 'Unknown',
+                              ),
+                              const HeightSpacer(8),
+                              _buildBookDetail(
+                                'Edition',
+                                book?.editionName ?? 'Unknown',
+                              ),
+                              const HeightSpacer(8),
+                              _buildBookDetail(
+                                'Pages',
+                                book?.totalPages?.toString() ?? 'Unknown',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const HeightSpacer(32),
+                  // Content Options Grid
+                  _buildContentGrid(book),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -177,7 +214,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     );
   }
 
-  Widget _buildContentGrid() {
+  Widget _buildContentGrid(BookModel? book) {
     return Column(
       children: [
         // First Row - 2 items
@@ -191,16 +228,16 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                   'Livre numérique',
                 ),
                 onTap: () {
-                  if (widget.book?.id == null) {
+                  if (book?.id == null) {
                     return;
                   }
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
-                    bookId: widget.book!.id,
-                    bookTitle: widget.book!.title,
+                    bookId: book!.id,
+                    bookTitle: book!.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=0&bookId=${widget.book!.id}',
+                    '${AppRoutes.bookContent}?tab=0&bookId=${book!.id}',
                   );
                 },
               ),
@@ -211,16 +248,16 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 icon: AppAssets.iconAudio,
                 title: _languageManager.getText('Audio book', 'Livre audio'),
                 onTap: () {
-                  if (widget.book?.id == null) {
+                  if (book?.id == null) {
                     return;
                   }
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
-                    bookId: widget.book!.id,
-                    bookTitle: widget.book!.title,
+                    bookId: book!.id,
+                    bookTitle: book!.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=1&bookId=${widget.book!.id}',
+                    '${AppRoutes.bookContent}?tab=1&bookId=${book!.id}',
                   );
                 },
               ),
@@ -236,16 +273,16 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 icon: AppAssets.iconQuiz,
                 title: _languageManager.getText('Quiz', 'Quiz'),
                 onTap: () {
-                  if (widget.book?.id == null) {
+                  if (book?.id == null) {
                     return;
                   }
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
-                    bookId: widget.book!.id,
-                    bookTitle: widget.book!.title,
+                    bookId: book!.id,
+                    bookTitle: book!.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=2&bookId=${widget.book!.id}',
+                    '${AppRoutes.bookContent}?tab=2&bookId=${book!.id}',
                   );
                 },
               ),
@@ -256,16 +293,16 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 icon: AppAssets.iconVideo,
                 title: _languageManager.getText('Videos', 'Vidéos'),
                 onTap: () {
-                  if (widget.book?.id == null) {
+                  if (book?.id == null) {
                     return;
                   }
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
-                    bookId: widget.book!.id,
-                    bookTitle: widget.book!.title,
+                    bookId: book!.id,
+                    bookTitle: book!.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=3&bookId=${widget.book!.id}',
+                    '${AppRoutes.bookContent}?tab=3&bookId=${book!.id}',
                   );
                 },
               ),
@@ -276,16 +313,16 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         // Third Row - 1 centered item
         GestureDetector(
           onTap: () {
-            if (widget.book?.id == null) {
+            if (book?.id == null) {
               return;
             }
             // Set book ID in global state
             context.read<BookCubit>().setBook(
-              bookId: widget.book!.id,
-              bookTitle: widget.book!.title,
+              bookId: book!.id,
+              bookTitle: book!.title,
             );
             context.push(
-              '${AppRoutes.bookContent}?tab=4&bookId=${widget.book!.id}',
+              '${AppRoutes.bookContent}?tab=4&bookId=${book!.id}',
             );
           },
           child: Container(

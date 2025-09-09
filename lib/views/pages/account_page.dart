@@ -335,7 +335,11 @@ class _AccountPageState extends State<AccountPage> {
         ),
         title: Text(
           title,
-          style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 16.sp,
+            fontWeight: FontWeight.w500,
+            color: isDestructive ? Colors.red : const Color(0xFF0C1138),
+          ),
         ),
         trailing: Icon(
           Icons.chevron_right,
@@ -349,7 +353,7 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Widget _buildSocialMenuItem({
-    required dynamic icon,
+    required String icon,
     required String title,
     required VoidCallback onTap,
     required Color iconColor,
