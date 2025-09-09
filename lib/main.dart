@@ -6,7 +6,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'constants/app_constants.dart';
 import 'core/di/service_locator.dart';
 import 'core/language/language_manager.dart';
+import 'data/cubits/auth/auth_cubit.dart';
 import 'data/cubits/audio/audio_cubit.dart';
+import 'data/cubits/book/book_state.dart';
+import 'data/cubits/book_content/book_content_state.dart';
+import 'data/cubits/home/home_cubit.dart';
 import 'data/cubits/images/images_cubit.dart';
 import 'data/cubits/pdf/pdf_cubit.dart';
 import 'data/cubits/quiz/quiz_cubit.dart';
@@ -37,6 +41,18 @@ class MyApp extends StatelessWidget {
           builder: (context, child) {
             return MultiBlocProvider(
               providers: [
+                BlocProvider<AuthCubit>(
+                  create: (context) => getIt<AuthCubit>(),
+                ),
+                BlocProvider<BookCubit>(
+                  create: (context) => getIt<BookCubit>(),
+                ),
+                BlocProvider<HomeCubit>(
+                  create: (context) => getIt<HomeCubit>(),
+                ),
+                BlocProvider<BookContentCubit>(
+                  create: (context) => getIt<BookContentCubit>(),
+                ),
                 BlocProvider<AudioCubit>(
                   create: (context) => getIt<AudioCubit>(),
                 ),

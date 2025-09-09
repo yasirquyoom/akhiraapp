@@ -86,7 +86,7 @@ class AppTheme {
     );
   }
 
-  static InputDecorationTheme _inputTheme(InputDecorationTheme base) {
+  static InputDecorationThemeData _inputTheme(InputDecorationThemeData base) {
     return base.copyWith(
       filled: true,
       fillColor: Colors.grey.shade50,

@@ -222,7 +222,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
 
                   // Artist/Author
                   Text(
-                    'Patrick Ness',
+                    state.currentTrack?.title ?? 'Unknown Artist',
                     style: TextStyle(
                       fontFamily: 'SFPro',
                       fontWeight: FontWeight.w500,

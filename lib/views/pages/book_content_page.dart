@@ -2,26 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
 import '../../data/cubits/audio/audio_cubit.dart';
-import '../../data/cubits/images/images_cubit.dart';
-import '../../data/cubits/pdf/pdf_cubit.dart';
+import '../../data/cubits/book/book_state.dart';
+import '../../data/cubits/book_content/book_content_state.dart';
 import '../../data/cubits/quiz/quiz_cubit.dart';
-import '../../data/cubits/videos/videos_cubit.dart';
-import '../../data/models/pdf_model.dart';
-import '../../data/models/video_model.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
-import '../../widgets/image_card_stack.dart';
 
 class BookContentPage extends StatefulWidget {
   final int initialTabIndex;
+  final String? bookId;
 
-  const BookContentPage({super.key, this.initialTabIndex = 0});
+  const BookContentPage({super.key, this.initialTabIndex = 0, this.bookId});
 
   @override
   State<BookContentPage> createState() => _BookContentPageState();
@@ -45,6 +41,9 @@ class _BookContentPageState extends State<BookContentPage>
       initialIndex: _currentTabIndex,
     );
     _tabController.addListener(_onTabChanged);
+
+    // Load book content - will use global state or widget parameter
+    _loadContentForCurrentTab();
   }
 
   @override
@@ -63,6 +62,52 @@ class _BookContentPageState extends State<BookContentPage>
     setState(() {
       _currentTabIndex = _tabController.index;
     });
+
+    // Load content for the new tab
+    _loadContentForCurrentTab();
+  }
+
+  void _loadContentForCurrentTab() {
+    // Get book ID from global state first, fallback to widget parameter
+    final bookCubit = context.read<BookCubit>();
+    String? bookId = bookCubit.getCurrentBookId();
+
+    // If no book ID in global state, try widget parameter
+    if (bookId == null && widget.bookId != null && widget.bookId!.isNotEmpty) {
+      bookId = widget.bookId;
+      // Set it in global state for future use
+      bookCubit.setBook(bookId: bookId!, bookTitle: 'Unknown Book');
+    }
+
+    if (bookId == null || bookId.isEmpty) {
+      print('Warning: Book ID is null or empty, cannot load content');
+      return;
+    }
+
+    String? contentType;
+    switch (_currentTabIndex) {
+      case 0: // Digital book
+        contentType = 'ebook';
+        break;
+      case 1: // Audio book
+        contentType = 'audio';
+        break;
+      case 2: // Quiz
+        contentType = 'quiz';
+        break;
+      case 3: // Videos
+        contentType = 'video';
+        break;
+      case 4: // Images
+        contentType = 'image';
+        break;
+    }
+
+    print('Loading content for bookId: $bookId, contentType: $contentType');
+    context.read<BookContentCubit>().loadContentByType(
+      bookId: bookId,
+      contentType: contentType ?? '',
+    );
   }
 
   @override
@@ -79,14 +124,29 @@ class _BookContentPageState extends State<BookContentPage>
             context.go(AppRoutes.bookDetails);
           },
         ),
-        title: Text(
-          'Patrick Ness',
-          style: const TextStyle(
-            fontFamily: 'SFPro',
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-            color: Colors.black,
-          ),
+        title: BlocBuilder<BookContentCubit, BookContentState>(
+          builder: (context, state) {
+            if (state is BookContentLoaded && state.data.bookDetails != null) {
+              return Text(
+                state.data.bookDetails!.bookName,
+                style: const TextStyle(
+                  fontFamily: 'SFPro',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: Colors.black,
+                ),
+              );
+            }
+            return Text(
+              'Book Content',
+              style: const TextStyle(
+                fontFamily: 'SFPro',
+                fontWeight: FontWeight.w600,
+                fontSize: 18,
+                color: Colors.black,
+              ),
+            );
+          },
         ),
         centerTitle: true,
         actions: [
@@ -195,13 +255,74 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildDigitalBookTab() {
-    return BlocBuilder<PdfCubit, PdfState>(
+    // Check if bookId is available in global state
+    final bookCubit = context.read<BookCubit>();
+    final bookId = bookCubit.getCurrentBookId();
+
+    if (bookId == null || bookId.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+            SizedBox(height: 16.h),
+            Text(
+              'No Book Selected',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Please go back and select a book first',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton(
+              onPressed: () => context.go(AppRoutes.home),
+              child: Text('Go to Home'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
-        if (state is PdfLoading) {
+        if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
-        } else if (state is PdfLoaded) {
-          return _buildPdfCard(state.pdf);
-        } else if (state is PdfError) {
+        } else if (state is BookContentLoaded) {
+          final ebookContents =
+              state.data.contents
+                  ?.where((content) => content.contentType == 'ebook')
+                  .toList() ??
+              [];
+
+          if (ebookContents.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.picture_as_pdf, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No PDF available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return _buildEbookList(ebookContents);
+        } else if (state is BookContentError) {
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -209,7 +330,7 @@ class _BookContentPageState extends State<BookContentPage>
                 Icon(Icons.error_outline, size: 64.sp, color: Colors.grey),
                 SizedBox(height: 16.h),
                 Text(
-                  'Error loading PDF',
+                  'Error loading content',
                   style: TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.w600,
@@ -222,32 +343,53 @@ class _BookContentPageState extends State<BookContentPage>
                   style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 24.h),
+                SizedBox(height: 16.h),
                 ElevatedButton(
-                  onPressed: () => context.read<PdfCubit>().reloadPdf(),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: Text('Retry', style: TextStyle(fontSize: 16.sp)),
+                  onPressed: () => _loadContentForCurrentTab(),
+                  child: Text('Retry'),
                 ),
               ],
             ),
           );
         }
-        return const Center(child: Text('No PDF available'));
+        return const Center(child: Text('No content available'));
       },
     );
   }
 
-  Widget _buildPdfCard(PdfModel pdf) {
+  Widget _buildEbookList(List<dynamic> ebookContents) {
+    return ListView.builder(
+      padding: EdgeInsets.all(AppConstants.defaultPadding),
+      itemCount: ebookContents.length,
+      itemBuilder: (context, index) {
+        final ebook = ebookContents[index];
+        return _buildEbookCard(ebook);
+      },
+    );
+  }
+
+  Widget _buildEbookCard(dynamic ebook) {
     return Padding(
       padding: EdgeInsets.all(AppConstants.defaultPadding),
       child: Column(
         children: [
           // PDF Preview Card
           GestureDetector(
-            onTap: () => context.go(AppRoutes.pdfViewer),
+            onTap: () {
+              // Navigate to PDF viewer with actual PDF data
+              context.push(
+                AppRoutes.pdfViewer,
+                extra: {
+                  'id': ebook.contentId,
+                  'title': ebook.title,
+                  'pdfUrl': ebook.fileUrl,
+                  'thumbnailUrl': '', // We don't have thumbnail from API
+                  'description': 'PDF from book content',
+                  'totalPages': 0, // We don't have page count from API
+                  'author': 'Unknown Author', // We don't have author from API
+                },
+              );
+            },
             child: Container(
               width: double.infinity,
               height: 400.h,
@@ -266,29 +408,15 @@ class _BookContentPageState extends State<BookContentPage>
                 child: Stack(
                   children: [
                     // PDF Thumbnail
-                    CachedNetworkImage(
-                      imageUrl: pdf.thumbnailUrl,
+                    Container(
                       width: double.infinity,
                       height: double.infinity,
-                      fit: BoxFit.cover,
-                      placeholder:
-                          (context, url) => Container(
-                            color: Colors.grey[200],
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                      errorWidget:
-                          (context, url, error) => Container(
-                            color: Colors.grey[200],
-                            child: Icon(
-                              Icons.picture_as_pdf,
-                              size: 64.sp,
-                              color: Colors.grey[400],
-                            ),
-                          ),
+                      color: Colors.grey[200],
+                      child: Icon(
+                        Icons.picture_as_pdf,
+                        size: 64.sp,
+                        color: Colors.grey[400],
+                      ),
                     ),
                     // Overlay with PDF icon
                     Positioned(
@@ -328,7 +456,7 @@ class _BookContentPageState extends State<BookContentPage>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              pdf.title,
+                              ebook.title,
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 18.sp,
@@ -339,7 +467,7 @@ class _BookContentPageState extends State<BookContentPage>
                             ),
                             SizedBox(height: 4.h),
                             Text(
-                              'By ${pdf.author}',
+                              'File Size: ${ebook.fileSizeMb.toStringAsFixed(1)} MB',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: 14.sp,
@@ -355,7 +483,7 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                                 SizedBox(width: 4.w),
                                 Text(
-                                  '${pdf.totalPages} pages',
+                                  'PDF Document',
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 12.sp,
@@ -420,7 +548,7 @@ class _BookContentPageState extends State<BookContentPage>
                 ),
                 SizedBox(height: 8.h),
                 Text(
-                  pdf.description,
+                  ebook.title,
                   style: TextStyle(
                     fontSize: 14.sp,
                     color: Colors.grey[600],
@@ -436,13 +564,74 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildAudioTab() {
-    return BlocBuilder<AudioCubit, AudioState>(
+    // Check if bookId is available in global state
+    final bookCubit = context.read<BookCubit>();
+    final bookId = bookCubit.getCurrentBookId();
+
+    if (bookId == null || bookId.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+            SizedBox(height: 16.h),
+            Text(
+              'No Book Selected',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Please go back and select a book first',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton(
+              onPressed: () => context.go(AppRoutes.home),
+              child: Text('Go to Home'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
-        if (state is AudioLoading) {
+        if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
-        } else if (state is AudioLoaded) {
-          return _buildAudioList(state);
-        } else if (state is AudioError) {
+        } else if (state is BookContentLoaded) {
+          final audioContents =
+              state.data.contents
+                  ?.where((content) => content.contentType == 'audio')
+                  .toList() ??
+              [];
+
+          if (audioContents.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.audiotrack, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No audio tracks available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return _buildAudioList(audioContents);
+        } else if (state is BookContentError) {
           return Center(child: Text('Error: ${state.message}'));
         }
         return const Center(child: Text('No audio tracks'));
@@ -450,26 +639,23 @@ class _BookContentPageState extends State<BookContentPage>
     );
   }
 
-  Widget _buildAudioList(AudioLoaded state) {
+  Widget _buildAudioList(List<dynamic> audioContents) {
     return ListView.builder(
       padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      itemCount: state.tracks.length,
+      itemCount: audioContents.length,
       itemBuilder: (context, index) {
-        final track = state.tracks[index];
-        return _buildAudioTrackCard(track, state);
+        final audio = audioContents[index];
+        return _buildAudioTrackCard(audio);
       },
     );
   }
 
-  Widget _buildAudioTrackCard(AudioTrack track, AudioLoaded state) {
-    final isCurrentlyPlaying =
-        state.currentTrack?.id == track.id && state.isPlaying;
-
+  Widget _buildAudioTrackCard(dynamic audio) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white, // Changed from gradient to white
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -487,13 +673,9 @@ class _BookContentPageState extends State<BookContentPage>
             height: 60,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(8),
-              image: const DecorationImage(
-                image: NetworkImage(
-                  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
-                ),
-                fit: BoxFit.cover,
-              ),
+              color: Colors.grey[200],
             ),
+            child: Icon(Icons.audiotrack, color: Colors.grey[400], size: 30),
           ),
           const SizedBox(width: 16),
           // Track Info
@@ -502,35 +684,41 @@ class _BookContentPageState extends State<BookContentPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  track.title,
+                  audio.title,
                   style: const TextStyle(
                     fontFamily: 'SFPro',
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
-                    color: Colors.black, // Changed from white to black
+                    color: Colors.black,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  track.duration,
+                  'File Size: ${audio.fileSizeMb.toStringAsFixed(1)} MB',
                   style: const TextStyle(
                     fontFamily: 'SFPro',
                     fontWeight: FontWeight.w500,
                     fontSize: 14,
-                    color: Colors.grey, // Changed from white70 to grey
+                    color: Colors.grey,
                   ),
                 ),
               ],
             ),
           ),
-          // Play/Pause Button
+          // Play Button
           GestureDetector(
             onTap: () {
-              if (isCurrentlyPlaying) {
-                context.read<AudioCubit>().pauseTrack();
-              } else {
-                context.read<AudioCubit>().playTrack(track);
-              }
+              // Create an AudioTrack from the BookContent audio data
+              final audioTrack = AudioTrack(
+                id: audio.id ?? 'unknown',
+                title: audio.title,
+                duration: '0:00', // We don't have duration from API
+                audioUrl: audio.fileUrl ?? '',
+                thumbnailUrl: audio.thumbnailUrl ?? '',
+              );
+
+              // Start playing the audio track
+              context.read<AudioCubit>().playTrack(audioTrack);
             },
             child: Container(
               width: 40,
@@ -539,8 +727,8 @@ class _BookContentPageState extends State<BookContentPage>
                 color: AppColors.tabActiveBg,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                isCurrentlyPlaying ? Icons.pause : Icons.play_arrow,
+              child: const Icon(
+                Icons.play_arrow,
                 color: Colors.white,
                 size: 24,
               ),
@@ -994,34 +1182,134 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildVideosTab() {
-    return BlocBuilder<VideosCubit, VideosState>(
+    // Check if bookId is available in global state
+    final bookCubit = context.read<BookCubit>();
+    final bookId = bookCubit.getCurrentBookId();
+
+    if (bookId == null || bookId.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+            SizedBox(height: 16.h),
+            Text(
+              'No Book Selected',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Please go back and select a book first',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton(
+              onPressed: () => context.go(AppRoutes.home),
+              child: Text('Go to Home'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
-        if (state is VideosLoaded) {
-          return _buildVideoList(state);
+        if (state is BookContentLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is BookContentLoaded) {
+          final videoContents =
+              state.data.contents
+                  ?.where((content) => content.contentType == 'video')
+                  .toList() ??
+              [];
+
+          if (videoContents.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.videocam, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No videos available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return _buildVideoList(videoContents);
+        } else if (state is BookContentError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+                SizedBox(height: 16.h),
+                Text(
+                  'Error loading videos',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red[700],
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  state.message,
+                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: () => _loadContentForCurrentTab(),
+                  child: Text('Retry'),
+                ),
+              ],
+            ),
+          );
         }
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: Text('No videos available'));
       },
     );
   }
 
-  Widget _buildVideoList(VideosLoaded state) {
+  Widget _buildVideoList(List<dynamic> videoContents) {
     return ListView.builder(
       padding: EdgeInsets.all(20.w),
-      itemCount: state.videos.length,
+      itemCount: videoContents.length,
       itemBuilder: (context, index) {
-        final video = state.videos[index];
+        final video = videoContents[index];
         return _buildVideoCard(video);
       },
     );
   }
 
-  Widget _buildVideoCard(VideoModel video) {
+  Widget _buildVideoCard(dynamic video) {
     return Container(
       margin: EdgeInsets.only(bottom: 16.h),
       child: GestureDetector(
         onTap: () {
-          // Navigate to fullscreen video player
-          context.go('${AppRoutes.videoFullscreen}?videoId=${video.id}');
+          // Navigate to video fullscreen page with video data
+          context.push(
+            AppRoutes.videoFullscreen,
+            extra: {
+              'title': video.title,
+              'videoUrl': video.fileUrl ?? '',
+              'thumbnailUrl': video.thumbnailUrl ?? '',
+              'fileSize': video.fileSizeMb,
+            },
+          );
         },
         child: Container(
           height: 200.h,
@@ -1041,21 +1329,13 @@ class _BookContentPageState extends State<BookContentPage>
               children: [
                 // Thumbnail Image
                 Positioned.fill(
-                  child: CachedNetworkImage(
-                    imageUrl: video.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    placeholder:
-                        (context, url) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                    errorWidget:
-                        (context, url, error) => Container(
-                          color: Colors.grey.shade200,
-                          child: const Icon(Icons.error, color: Colors.grey),
-                        ),
+                  child: Container(
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.videocam,
+                      size: 64.sp,
+                      color: Colors.grey[400],
+                    ),
                   ),
                 ),
 
@@ -1131,7 +1411,7 @@ class _BookContentPageState extends State<BookContentPage>
                         ),
                         SizedBox(height: 4.h),
                         Text(
-                          video.duration,
+                          'File Size: ${video.fileSizeMb.toStringAsFixed(1)} MB',
                           style: TextStyle(
                             fontFamily: 'SFPro',
                             fontWeight: FontWeight.w500,
@@ -1152,50 +1432,146 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildImagesTab() {
-    return BlocBuilder<ImagesCubit, ImagesState>(
+    return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
-        if (state is ImagesLoaded) {
-          return _buildImageGallery(state);
+        if (state is BookContentLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is BookContentLoaded) {
+          final imageContents =
+              state.data.contents
+                  ?.where((content) => content.contentType == 'image')
+                  .toList() ??
+              [];
+
+          if (imageContents.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.image, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No images available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return _buildImageGallery(imageContents);
+        } else if (state is BookContentError) {
+          return Center(child: Text('Error: ${state.message}'));
         }
-        return const Center(child: CircularProgressIndicator());
+        return const Center(child: Text('No images available'));
       },
     );
   }
 
-  Widget _buildImageGallery(ImagesLoaded state) {
-    return ImageCardStack(
-      state: state,
-      onSwipeLeft: () => context.read<ImagesCubit>().nextImage(),
-      onSwipeRight: () => context.read<ImagesCubit>().previousImage(),
-      onDownload: () async {
-        try {
-          await context.read<ImagesCubit>().downloadImage(
-            state.images[state.currentIndex].imageUrl,
-          );
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Image downloaded successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
-        } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Download failed: $e'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
+  Widget _buildImageGallery(List<dynamic> imageContents) {
+    return ListView.builder(
+      padding: EdgeInsets.all(20.w),
+      itemCount: imageContents.length,
+      itemBuilder: (context, index) {
+        final image = imageContents[index];
+        return _buildImageCard(image);
       },
-      onShare: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Share functionality coming soon!')),
-        );
-      },
+    );
+  }
+
+  Widget _buildImageCard(dynamic image) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 16.h),
+      child: GestureDetector(
+        onTap: () {
+          // TODO: Implement image viewer
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Viewing: ${image.title}')));
+        },
+        child: Container(
+          height: 200.h,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12.r),
+            child: Stack(
+              children: [
+                // Image
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.image,
+                      size: 64.sp,
+                      color: Colors.grey[400],
+                    ),
+                  ),
+                ),
+
+                // Image Info
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: EdgeInsets.all(16.w),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withOpacity(0.8),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          image.title,
+                          style: TextStyle(
+                            fontFamily: 'SFPro',
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16.sp,
+                            color: Colors.white,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'File Size: ${image.fileSizeMb.toStringAsFixed(1)} MB',
+                          style: TextStyle(
+                            fontFamily: 'SFPro',
+                            fontWeight: FontWeight.w500,
+                            fontSize: 14.sp,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -7,6 +7,9 @@ class BookModel extends Equatable {
   final String coverImageUrl;
   final String? description;
   final DateTime? publishedDate;
+  final String? editionName;
+  final int? totalPages;
+  final String? addedAt;
 
   const BookModel({
     required this.id,
@@ -15,19 +18,26 @@ class BookModel extends Equatable {
     required this.coverImageUrl,
     this.description,
     this.publishedDate,
+    this.editionName,
+    this.totalPages,
+    this.addedAt,
   });
 
   factory BookModel.fromJson(Map<String, dynamic> json) {
     return BookModel(
-      id: json['id'] as String,
-      title: json['title'] as String,
-      author: json['author'] as String,
-      coverImageUrl: json['coverImageUrl'] as String,
+      id: json['book_id'] as String? ?? json['id'] as String,
+      title: json['book_name'] as String? ?? json['title'] as String,
+      author: json['author_name'] as String? ?? json['author'] as String,
+      coverImageUrl:
+          json['cover_image_url'] as String? ?? json['coverImageUrl'] as String,
       description: json['description'] as String?,
       publishedDate:
           json['publishedDate'] != null
               ? DateTime.parse(json['publishedDate'] as String)
               : null,
+      editionName: json['edition_name'] as String?,
+      totalPages: json['total_pages'] as int?,
+      addedAt: json['added_at'] as String?,
     );
   }
 
@@ -39,6 +49,9 @@ class BookModel extends Equatable {
       'coverImageUrl': coverImageUrl,
       'description': description,
       'publishedDate': publishedDate?.toIso8601String(),
+      'editionName': editionName,
+      'totalPages': totalPages,
+      'addedAt': addedAt,
     };
   }
 
@@ -50,5 +63,8 @@ class BookModel extends Equatable {
     coverImageUrl,
     description,
     publishedDate,
+    editionName,
+    totalPages,
+    addedAt,
   ];
 }

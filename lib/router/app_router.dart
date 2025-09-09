@@ -4,13 +4,11 @@ import 'package:akhira/views/pages/pdf_viewer_page.dart';
 import 'package:akhira/views/pages/splash_page.dart';
 import 'package:akhira/views/pages/video_fullscreen_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../core/di/service_locator.dart';
-import '../data/cubits/home/home_cubit.dart';
 import '../data/models/pdf_model.dart';
 import '../data/models/video_model.dart';
+import '../data/models/book_model.dart';
 import '../views/pages/book_content_page.dart';
 import '../views/pages/create_account_page.dart';
 import '../views/pages/email_sent_page.dart';
@@ -78,19 +76,15 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.home,
         name: 'home',
-        pageBuilder:
-            (context, state) => _noTransitionPage(
-              BlocProvider(
-                create: (context) => getIt<HomeCubit>(),
-                child: const HomePage(),
-              ),
-            ),
+        pageBuilder: (context, state) => _noTransitionPage(const HomePage()),
       ),
       GoRoute(
         path: AppRoutes.bookDetails,
         name: 'bookDetails',
         pageBuilder:
-            (context, state) => _noTransitionPage(const BookDetailsPage()),
+            (context, state) => _noTransitionPage(
+              BookDetailsPage(book: state.extra as BookModel?),
+            ),
       ),
       GoRoute(
         path: AppRoutes.bookContent,
@@ -98,7 +92,10 @@ class AppRouter {
         pageBuilder: (context, state) {
           final tabIndex =
               int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
-          return _noTransitionPage(BookContentPage(initialTabIndex: tabIndex));
+          final bookId = state.uri.queryParameters['bookId'];
+          return _noTransitionPage(
+            BookContentPage(initialTabIndex: tabIndex, bookId: bookId),
+          );
         },
       ),
       GoRoute(
@@ -111,7 +108,23 @@ class AppRouter {
         path: AppRoutes.videoFullscreen,
         name: 'videoFullscreen',
         pageBuilder: (context, state) {
-          // For now, we'll pass a dummy video. In a real app, you'd fetch the video by ID
+          // Get video data from extra parameter
+          final videoData = state.extra as Map<String, dynamic>?;
+
+          if (videoData != null) {
+            final video = VideoModel(
+              id: 'dynamic_${DateTime.now().millisecondsSinceEpoch}',
+              title: videoData['title'] ?? 'Unknown Video',
+              thumbnailUrl: videoData['thumbnailUrl'] ?? '',
+              videoUrl: videoData['videoUrl'] ?? '',
+              duration: '0:00', // We don't have duration from API
+              description: 'Video from book content',
+            );
+
+            return _noTransitionPage(VideoFullscreenPage(video: video));
+          }
+
+          // Fallback to dummy video if no data provided
           return _noTransitionPage(
             VideoFullscreenPage(
               video: const VideoModel(
@@ -132,7 +145,24 @@ class AppRouter {
         path: AppRoutes.pdfViewer,
         name: 'pdfViewer',
         pageBuilder: (context, state) {
-          // For now, we'll pass a dummy PDF. In a real app, you'd fetch the PDF by ID
+          // Get PDF data from extra parameter
+          final pdfData = state.extra as Map<String, dynamic>?;
+
+          if (pdfData != null) {
+            final pdf = PdfModel(
+              id: pdfData['id'] ?? 'unknown',
+              title: pdfData['title'] ?? 'Unknown PDF',
+              pdfUrl: pdfData['pdfUrl'] ?? '',
+              thumbnailUrl: pdfData['thumbnailUrl'] ?? '',
+              description: pdfData['description'] ?? 'PDF from book content',
+              totalPages: pdfData['totalPages'] ?? 0,
+              author: pdfData['author'] ?? 'Unknown Author',
+            );
+
+            return _noTransitionPage(PdfViewerPage(pdf: pdf));
+          }
+
+          // Fallback to dummy PDF if no data provided
           return _noTransitionPage(
             PdfViewerPage(
               pdf: const PdfModel(

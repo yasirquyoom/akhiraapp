@@ -32,3 +32,23 @@ class HomeError extends HomeState {
   @override
   List<Object?> get props => [message];
 }
+
+class HomeRedeeming extends HomeState {}
+
+class HomeRedeemSuccess extends HomeState {
+  final String message;
+
+  const HomeRedeemSuccess({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
+class HomeRedeemError extends HomeState {
+  final String message;
+
+  const HomeRedeemError({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}

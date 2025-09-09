@@ -1,16 +1,21 @@
 import 'package:akhira/widgets/width_spacer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/app_assets.dart';
 import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
+import '../../data/cubits/book/book_state.dart';
+import '../../data/models/book_model.dart';
 import '../../router/app_router.dart';
 import '../../widgets/height_spacer.dart';
 import '../../widgets/language_toggle.dart';
 
 class BookDetailsPage extends StatefulWidget {
-  const BookDetailsPage({super.key});
+  final BookModel? book;
+
+  const BookDetailsPage({super.key, this.book});
 
   @override
   State<BookDetailsPage> createState() => _BookDetailsPageState();
@@ -24,6 +29,14 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
     super.initState();
     _languageManager = LanguageManager();
     _languageManager.addListener(_onLanguageChanged);
+
+    // Set book ID in global state when page loads
+    if (widget.book != null) {
+      context.read<BookCubit>().setBook(
+        bookId: widget.book!.id,
+        bookTitle: widget.book!.title,
+      );
+    }
   }
 
   @override
@@ -48,7 +61,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
           onPressed: () => context.go(AppRoutes.home),
         ),
         title: Text(
-          'Patrick Ness',
+          widget.book?.title ?? 'Book Details',
           style: const TextStyle(
             fontFamily: 'SFPro',
             fontWeight: FontWeight.w600,
@@ -88,12 +101,20 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                         height: 200,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(12),
-                          image: const DecorationImage(
-                            image: NetworkImage(
-                              'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
-                            ),
-                            fit: BoxFit.cover,
-                          ),
+                          image:
+                              widget.book?.coverImageUrl != null
+                                  ? DecorationImage(
+                                    image: NetworkImage(
+                                      widget.book!.coverImageUrl,
+                                    ),
+                                    fit: BoxFit.cover,
+                                  )
+                                  : const DecorationImage(
+                                    image: NetworkImage(
+                                      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
+                                    ),
+                                    fit: BoxFit.cover,
+                                  ),
                         ),
                       ),
                     ),
@@ -105,7 +126,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Patrick Ness',
+                            widget.book?.title ?? 'Unknown Book',
                             style: const TextStyle(
                               fontFamily: 'SFPro',
                               fontWeight: FontWeight.w700,
@@ -114,11 +135,20 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                             ),
                           ),
                           const HeightSpacer(16),
-                          _buildBookDetail('Author', 'Harley'),
+                          _buildBookDetail(
+                            'Author',
+                            widget.book?.author ?? 'Unknown',
+                          ),
                           const HeightSpacer(8),
-                          _buildBookDetail('Éditions', '2004'),
+                          _buildBookDetail(
+                            'Edition',
+                            widget.book?.editionName ?? 'Unknown',
+                          ),
                           const HeightSpacer(8),
-                          _buildBookDetail('Pages', '250'),
+                          _buildBookDetail(
+                            'Pages',
+                            widget.book?.totalPages?.toString() ?? 'Unknown',
+                          ),
                         ],
                       ),
                     ),
@@ -161,7 +191,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                   'Livre numérique',
                 ),
                 onTap: () {
-                  context.push('${AppRoutes.bookContent}?tab=0');
+                  if (widget.book?.id == null) {
+                    return;
+                  }
+                  // Set book ID in global state
+                  context.read<BookCubit>().setBook(
+                    bookId: widget.book!.id,
+                    bookTitle: widget.book!.title,
+                  );
+                  context.push(
+                    '${AppRoutes.bookContent}?tab=0&bookId=${widget.book!.id}',
+                  );
                 },
               ),
             ),
@@ -171,7 +211,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 icon: AppAssets.iconAudio,
                 title: _languageManager.getText('Audio book', 'Livre audio'),
                 onTap: () {
-                  context.push('${AppRoutes.bookContent}?tab=1');
+                  if (widget.book?.id == null) {
+                    return;
+                  }
+                  // Set book ID in global state
+                  context.read<BookCubit>().setBook(
+                    bookId: widget.book!.id,
+                    bookTitle: widget.book!.title,
+                  );
+                  context.push(
+                    '${AppRoutes.bookContent}?tab=1&bookId=${widget.book!.id}',
+                  );
                 },
               ),
             ),
@@ -186,7 +236,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 icon: AppAssets.iconQuiz,
                 title: _languageManager.getText('Quiz', 'Quiz'),
                 onTap: () {
-                  context.push('${AppRoutes.bookContent}?tab=2');
+                  if (widget.book?.id == null) {
+                    return;
+                  }
+                  // Set book ID in global state
+                  context.read<BookCubit>().setBook(
+                    bookId: widget.book!.id,
+                    bookTitle: widget.book!.title,
+                  );
+                  context.push(
+                    '${AppRoutes.bookContent}?tab=2&bookId=${widget.book!.id}',
+                  );
                 },
               ),
             ),
@@ -196,7 +256,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                 icon: AppAssets.iconVideo,
                 title: _languageManager.getText('Videos', 'Vidéos'),
                 onTap: () {
-                  context.push('${AppRoutes.bookContent}?tab=3');
+                  if (widget.book?.id == null) {
+                    return;
+                  }
+                  // Set book ID in global state
+                  context.read<BookCubit>().setBook(
+                    bookId: widget.book!.id,
+                    bookTitle: widget.book!.title,
+                  );
+                  context.push(
+                    '${AppRoutes.bookContent}?tab=3&bookId=${widget.book!.id}',
+                  );
                 },
               ),
             ),
@@ -206,7 +276,17 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         // Third Row - 1 centered item
         GestureDetector(
           onTap: () {
-            context.push('${AppRoutes.bookContent}?tab=4');
+            if (widget.book?.id == null) {
+              return;
+            }
+            // Set book ID in global state
+            context.read<BookCubit>().setBook(
+              bookId: widget.book!.id,
+              bookTitle: widget.book!.title,
+            );
+            context.push(
+              '${AppRoutes.bookContent}?tab=4&bookId=${widget.book!.id}',
+            );
           },
           child: Container(
             padding: const EdgeInsets.all(20),

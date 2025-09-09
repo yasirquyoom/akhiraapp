@@ -4,6 +4,7 @@ import 'package:pretty_dio_logger/pretty_dio_logger.dart';
 import '../../core/di/service_locator.dart';
 import '../../router/app_router.dart';
 import '../api/endpoints.dart';
+import '../services/storage_service.dart';
 
 class DioClient {
   final Dio _dio;
@@ -11,8 +12,18 @@ class DioClient {
     initialize();
   }
 
-  void initialize() {
+  void initialize() async {
+    // Get stored access token
+    final token = await StorageService.getAccessToken();
+
     final authInterceptor = InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        // Add Authorization header if token exists
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
+        }
+        return handler.next(options);
+      },
       onError: (error, handler) async {
         final statusCode = error.response?.statusCode;
         if (statusCode == 401 || statusCode == 403) {

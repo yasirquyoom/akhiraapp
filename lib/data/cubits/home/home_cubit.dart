@@ -1,95 +1,89 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../models/book_model.dart';
+import '../../models/redeem_request.dart';
+import '../../repositories/collection_repository.dart';
 import 'home_state.dart';
 
 class HomeCubit extends Cubit<HomeState> {
-  HomeCubit() : super(HomeInitial()) {
-    _loadInitialData();
+  final CollectionRepository _collectionRepository;
+  bool _hasLoaded = false;
+
+  HomeCubit(this._collectionRepository) : super(HomeInitial()) {
+    loadCollections();
   }
 
-  void _loadInitialData() {
-    // For now, start with empty state
-    emit(HomeEmpty());
-  }
+  Future<void> loadCollections() async {
+    if (_hasLoaded && state is! HomeError) {
+      return; // Don't reload if already loaded successfully
+    }
 
-  void addBook(String bookCode) {
-    // Simulate adding a book
-    if (state is HomeEmpty) {
-      // Add dummy books when transitioning from empty to loaded
-      final dummyBooks = _getDummyBooks();
-      emit(HomeLoaded(books: dummyBooks));
-    } else if (state is HomeLoaded) {
-      // Add a new book to existing list
-      final currentBooks = (state as HomeLoaded).books;
-      final newBook = _createDummyBook(bookCode);
-      emit(HomeLoaded(books: [...currentBooks, newBook]));
+    if (isClosed) return; // Don't emit if cubit is closed
+
+    emit(HomeLoading());
+
+    try {
+      final response = await _collectionRepository.getCollections();
+
+      if (isClosed) return; // Check again after async operation
+
+      if (response.status == 200 && response.data?.collections != null) {
+        final collections = response.data!.collections!;
+
+        if (collections.isEmpty) {
+          emit(HomeEmpty());
+        } else {
+          // Convert BookCollection to BookModel
+          final books =
+              collections
+                  .map(
+                    (collection) => BookModel(
+                      id: collection.bookId,
+                      title: collection.bookName,
+                      author: collection.authorName,
+                      coverImageUrl: collection.coverImageUrl,
+                      editionName: collection.editionName,
+                      totalPages: collection.totalPages,
+                      addedAt: collection.addedAt,
+                    ),
+                  )
+                  .toList();
+
+          emit(HomeLoaded(books: books));
+        }
+        _hasLoaded = true;
+      } else {
+        emit(HomeError(message: response.message));
+      }
+    } catch (e) {
+      if (isClosed) return; // Check again after async operation
+      emit(HomeError(message: e.toString()));
     }
   }
 
-  List<BookModel> _getDummyBooks() {
-    return [
-      const BookModel(
-        id: '1',
-        title: 'RELEASE',
-        author: 'PATRICK NESS',
-        coverImageUrl:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTjfCdT5dSfzKqLa3ROQuu257BFTCRP0-aqRw&s',
-      ),
-      const BookModel(
-        id: '2',
-        title: 'NO TIME TO DIE',
-        author: 'JAMES BOND IS BACK!',
-        coverImageUrl:
-            'https://w0.peakpx.com/wallpaper/423/86/HD-wallpaper-muslim-dp-book-islamic-thumbnail.jpg',
-      ),
-      const BookModel(
-        id: '3',
-        title: "I'll Be There",
-        author: 'a novel by HOLLY GOLDBERG SLOAN',
-        coverImageUrl:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSHOuwg39tHgMIVLHWZjgHHIo-VtIUY21iLLA&s',
-      ),
-      const BookModel(
-        id: '4',
-        title: "I'll Be There",
-        author: 'a novel by HOLLY GOLDBERG SLOAN',
-        coverImageUrl:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS1xNYdMWh8_E9s9k2nednrfkTpsRVuQ1II3w&usqp=CAU',
-      ),
-      const BookModel(
-        id: '5',
-        title: "I'll Be There",
-        author: 'a novel by HOLLY GOLDBERG SLOAN',
-        coverImageUrl:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTrQYkpUFa7UFT0ANTF52y5PPz1BimvVfBtLQ&usqp=CAU',
-      ),
-      const BookModel(
-        id: '6',
-        title: "I'll Be There",
-        author: 'a novel by HOLLY GOLDBERG SLOAN',
-        coverImageUrl:
-            'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQukAB0NYyPpjDLvtuxEF6mzjPHSAoo1vH1zw&usqp=CAU',
-      ),
-    ];
-  }
+  Future<void> redeemBook(String bookCode) async {
+    if (isClosed) return; // Don't emit if cubit is closed
 
-  BookModel _createDummyBook(String bookCode) {
-    final imageUrls = [
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTrQYkpUFa7UFT0ANTF52y5PPz1BimvVfBtLQ&usqp=CAU',
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTihtvx5SIdixK75-zUTOkjlvJLVgrkn6DuOQ&usqp=CAU',
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSHOuwg39tHgMIVLHWZjgHHIo-VtIUY21iLLA&s',
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRSGQaa7FEfuxap2EkbrBtmY7WeCs1-FAVWmA&usqp=CAU',
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTrQYkpUFa7UFT0ANTF52y5PPz1BimvVfBtLQ&usqp=CAU',
-      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSHOuwg39tHgMIVLHWZjgHHIo-VtIUY21iLLA&s',
-    ];
+    emit(HomeRedeeming());
 
-    return BookModel(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: 'New Book $bookCode',
-      author: 'Author Name',
-      coverImageUrl:
-          imageUrls[DateTime.now().millisecondsSinceEpoch % imageUrls.length],
-    );
+    try {
+      final response = await _collectionRepository.redeemBook(
+        RedeemRequest(code: bookCode),
+      );
+
+      if (isClosed) return; // Check again after async operation
+
+      if (response.status == 200) {
+        emit(HomeRedeemSuccess(message: response.message));
+        // Reload collections after successful redemption
+        _hasLoaded = false; // Reset flag to allow reload
+        await loadCollections();
+      } else {
+        emit(HomeRedeemError(message: response.message));
+      }
+    } catch (e) {
+      if (isClosed) return; // Check again after async operation
+      emit(HomeRedeemError(message: e.toString()));
+    }
   }
 }

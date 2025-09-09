@@ -6,12 +6,14 @@ import '../../constants/app_assets.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
+import '../../data/cubits/auth/auth_cubit.dart';
 import '../../data/cubits/home/home_cubit.dart';
 import '../../data/cubits/home/home_state.dart';
 import '../../data/models/book_model.dart';
 import '../../router/app_router.dart';
 import '../../widgets/book_card.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_feedback.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/height_spacer.dart';
 import '../../widgets/language_toggle.dart';
@@ -62,9 +64,46 @@ class _HomePageState extends State<HomePage> {
   void _addBook() {
     final bookCode = _bookCodeController.text.trim();
     if (bookCode.isNotEmpty) {
-      context.read<HomeCubit>().addBook(bookCode);
-      _hideAddBookDialog();
+      try {
+        final homeCubit = context.read<HomeCubit>();
+        homeCubit.redeemBook(bookCode);
+      } catch (e) {
+        context.showErrorFeedback('Error: $e');
+        _hideAddBookDialog();
+      }
+    } else {
+      context.showWarningFeedback('Please enter a book code');
     }
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(_languageManager.getText('Logout', 'Déconnexion')),
+            content: Text(
+              _languageManager.getText(
+                'Are you sure you want to logout?',
+                'Êtes-vous sûr de vouloir vous déconnecter?',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(_languageManager.getText('Cancel', 'Annuler')),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  context.read<AuthCubit>().logout();
+                  context.go(AppRoutes.login);
+                },
+                child: Text(_languageManager.getText('Logout', 'Déconnexion')),
+              ),
+            ],
+          ),
+    );
   }
 
   @override
@@ -72,72 +111,92 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFD6DCED),
       body: SafeArea(
-        child: BlocBuilder<HomeCubit, HomeState>(
-          builder: (context, state) {
-            return Stack(
-              children: [
-                // Main content
-                Padding(
-                  padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                  child: Column(
-                    children: [
-                      // Header with logo and profile
-                      Row(
-                        children: [
-                          // Logo
-                          Row(
-                            children: [
-                              Image.asset(
-                                AppAssets.iconLogo,
+        child: BlocListener<HomeCubit, HomeState>(
+          listener: (context, state) {
+            if (state is HomeRedeemSuccess) {
+              context.showSuccessFeedback(state.message);
+              _hideAddBookDialog(); // Close modal on success
+            } else if (state is HomeRedeemError) {
+              context.showErrorFeedback(state.message);
+              _hideAddBookDialog(); // Close modal on error
+            } else if (state is HomeError) {
+              context.showErrorFeedback(state.message);
+            }
+          },
+          child: BlocBuilder<HomeCubit, HomeState>(
+            builder: (context, state) {
+              return Stack(
+                children: [
+                  // Main content
+                  Padding(
+                    padding: const EdgeInsets.all(AppConstants.defaultPadding),
+                    child: Column(
+                      children: [
+                        // Header with logo and profile
+                        Row(
+                          children: [
+                            // Logo
+                            Row(
+                              children: [
+                                Image.asset(
+                                  AppAssets.iconLogo,
+                                  width: 32,
+                                  height: 32,
+                                ),
+                                const SizedBox(width: 8),
+                                Image.asset(
+                                  AppAssets.appTextLogo,
+                                  scale: 10,
+                                  color: Colors.black,
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            // Language toggle
+                            LanguageToggle(languageManager: _languageManager),
+                            const SizedBox(width: 12),
+                            // Profile icon with logout
+                            GestureDetector(
+                              onTap: () => _showLogoutDialog(),
+                              child: Container(
                                 width: 32,
                                 height: 32,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade300,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.person,
+                                  size: 20,
+                                  color: Colors.grey,
+                                ),
                               ),
-                              const SizedBox(width: 8),
-                              Image.asset(
-                                AppAssets.appTextLogo,
-                                scale: 10,
-                                color: Colors.black,
-                              ),
-                            ],
-                          ),
-                          const Spacer(),
-                          // Language toggle
-                          LanguageToggle(languageManager: _languageManager),
-                          const SizedBox(width: 12),
-                          // Profile icon
-                          Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.person,
-                              size: 20,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const HeightSpacer(20),
-                      // Content based on state
-                      Expanded(
-                        child:
-                            state is HomeEmpty
-                                ? _buildEmptyState()
-                                : state is HomeLoaded
-                                ? _buildLibraryState(state.books)
-                                : const SizedBox(),
-                      ),
-                    ],
+                          ],
+                        ),
+                        const HeightSpacer(20),
+                        // Content based on state
+                        Expanded(
+                          child:
+                              state is HomeLoading
+                                  ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                  : state is HomeEmpty
+                                  ? _buildEmptyState()
+                                  : state is HomeLoaded
+                                  ? _buildLibraryState(state.books)
+                                  : const SizedBox(),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                // Add book modal
-                if (_showAddBookModal) _buildAddBookModal(state),
-              ],
-            );
-          },
+                  // Add book modal
+                  if (_showAddBookModal) _buildAddBookModal(state),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -231,7 +290,7 @@ class _HomePageState extends State<HomePage> {
               return BookCard(
                 book: books[index],
                 onTap: () {
-                  context.go(AppRoutes.bookDetails);
+                  context.go(AppRoutes.bookDetails, extra: books[index]);
                 },
               );
             },
@@ -301,16 +360,18 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const HeightSpacer(24),
                   // Verify button
-                  CustomButton(
-                    label: _languageManager.getText(
-                      'Verify code',
-                      'Vérifier le code',
-                    ),
-                    onPressed: _addBook,
-                    useGradient: false,
-                    backgroundColor: AppColors.primary,
-                    textColor: Colors.white,
-                  ),
+                  state is HomeRedeeming
+                      ? const Center(child: CircularProgressIndicator())
+                      : CustomButton(
+                        label: _languageManager.getText(
+                          'Verify code',
+                          'Vérifier le code',
+                        ),
+                        onPressed: _addBook,
+                        useGradient: false,
+                        backgroundColor: AppColors.primary,
+                        textColor: Colors.white,
+                      ),
                   const HeightSpacer(16),
                   // Cancel button
                   Center(
