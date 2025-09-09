@@ -1,3 +1,4 @@
+import 'package:akhira/views/pages/account_page.dart';
 import 'package:akhira/views/pages/audio_fullscreen_page.dart';
 import 'package:akhira/views/pages/book_details_page.dart';
 import 'package:akhira/views/pages/pdf_viewer_page.dart';
@@ -32,6 +33,7 @@ class AppRoutes {
   static const String audioFullscreen = '/audio-fullscreen';
   static const String videoFullscreen = '/video-fullscreen';
   static const String pdfViewer = '/pdf-viewer';
+  static const String account = '/account';
 }
 
 class AppRouter {
@@ -180,6 +182,11 @@ class AppRouter {
             ),
           );
         },
+      ),
+      GoRoute(
+        path: AppRoutes.account,
+        name: 'account',
+        pageBuilder: (context, state) => _noTransitionPage(const AccountPage()),
       ),
     ],
     errorBuilder: (context, state) {

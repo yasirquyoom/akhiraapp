@@ -6,7 +6,6 @@ import '../../constants/app_assets.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_constants.dart';
 import '../../core/language/language_manager.dart';
-import '../../data/cubits/auth/auth_cubit.dart';
 import '../../data/cubits/home/home_cubit.dart';
 import '../../data/cubits/home/home_state.dart';
 import '../../data/models/book_model.dart';
@@ -76,36 +75,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text(_languageManager.getText('Logout', 'Déconnexion')),
-            content: Text(
-              _languageManager.getText(
-                'Are you sure you want to logout?',
-                'Êtes-vous sûr de vouloir vous déconnecter?',
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(_languageManager.getText('Cancel', 'Annuler')),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  context.read<AuthCubit>().logout();
-                  context.go(AppRoutes.login);
-                },
-                child: Text(_languageManager.getText('Logout', 'Déconnexion')),
-              ),
-            ],
-          ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -155,9 +124,9 @@ class _HomePageState extends State<HomePage> {
                             // Language toggle
                             LanguageToggle(languageManager: _languageManager),
                             const SizedBox(width: 12),
-                            // Profile icon with logout
+                            // Profile icon - navigate to account page
                             GestureDetector(
-                              onTap: () => _showLogoutDialog(),
+                              onTap: () => context.push(AppRoutes.account),
                               child: Container(
                                 width: 32,
                                 height: 32,

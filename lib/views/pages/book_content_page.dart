@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -465,14 +466,14 @@ class _BookContentPageState extends State<BookContentPage>
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 4.h),
-                            Text(
-                              'File Size: ${ebook.fileSizeMb.toStringAsFixed(1)} MB',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 14.sp,
-                              ),
-                            ),
+                            // SizedBox(height: 4.h),
+                            // Text(
+                            //   'File Size: ${ebook.fileSizeMb.toStringAsFixed(1)} MB',
+                            //   style: TextStyle(
+                            //     color: Colors.white70,
+                            //     fontSize: 14.sp,
+                            //   ),
+                            // ),
                             SizedBox(height: 8.h),
                             Row(
                               children: [
@@ -685,6 +686,7 @@ class _BookContentPageState extends State<BookContentPage>
               children: [
                 Text(
                   audio.title,
+                  maxLines: 2,
                   style: const TextStyle(
                     fontFamily: 'SFPro',
                     fontWeight: FontWeight.w700,
@@ -692,16 +694,16 @@ class _BookContentPageState extends State<BookContentPage>
                     color: Colors.black,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'File Size: ${audio.fileSizeMb.toStringAsFixed(1)} MB',
-                  style: const TextStyle(
-                    fontFamily: 'SFPro',
-                    fontWeight: FontWeight.w500,
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                ),
+                // const SizedBox(height: 4),
+                // Text(
+                //   'File Size: ${audio.fileSizeMb.toStringAsFixed(1)} MB',
+                //   style: const TextStyle(
+                //     fontFamily: 'SFPro',
+                //     fontWeight: FontWeight.w500,
+                //     fontSize: 14,
+                //     color: Colors.grey,
+                //   ),
+                // ),
               ],
             ),
           ),
@@ -710,11 +712,11 @@ class _BookContentPageState extends State<BookContentPage>
             onTap: () {
               // Create an AudioTrack from the BookContent audio data
               final audioTrack = AudioTrack(
-                id: audio.id ?? 'unknown',
+                id: audio.contentId ?? 'unknown',
                 title: audio.title,
                 duration: '0:00', // We don't have duration from API
                 audioUrl: audio.fileUrl ?? '',
-                thumbnailUrl: audio.thumbnailUrl ?? '',
+                thumbnailUrl: '', // BookContent doesn't have thumbnailUrl field
               );
 
               // Start playing the audio track
@@ -1306,7 +1308,7 @@ class _BookContentPageState extends State<BookContentPage>
             extra: {
               'title': video.title,
               'videoUrl': video.fileUrl ?? '',
-              'thumbnailUrl': video.thumbnailUrl ?? '',
+              'thumbnailUrl': '', // BookContent doesn't have thumbnailUrl field
               'fileSize': video.fileSizeMb,
             },
           );
@@ -1409,16 +1411,16 @@ class _BookContentPageState extends State<BookContentPage>
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          'File Size: ${video.fileSizeMb.toStringAsFixed(1)} MB',
-                          style: TextStyle(
-                            fontFamily: 'SFPro',
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14.sp,
-                            color: Colors.white70,
-                          ),
-                        ),
+                        // SizedBox(height: 4.h),
+                        // Text(
+                        //   'File Size: ${video.fileSizeMb.toStringAsFixed(1)} MB',
+                        //   style: TextStyle(
+                        //     fontFamily: 'SFPro',
+                        //     fontWeight: FontWeight.w500,
+                        //     fontSize: 14.sp,
+                        //     color: Colors.white70,
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),
@@ -1432,6 +1434,41 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildImagesTab() {
+    // Check if bookId is available in global state
+    final bookCubit = context.read<BookCubit>();
+    final bookId = bookCubit.getCurrentBookId();
+
+    if (bookId == null || bookId.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+            SizedBox(height: 16.h),
+            Text(
+              'No Book Selected',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Please go back and select a book first',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton(
+              onPressed: () => context.go(AppRoutes.home),
+              child: Text('Go to Home'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
         if (state is BookContentLoading) {
@@ -1463,7 +1500,7 @@ class _BookContentPageState extends State<BookContentPage>
             );
           }
 
-          return _buildImageGallery(imageContents);
+          return _buildImageCardStack(imageContents);
         } else if (state is BookContentError) {
           return Center(child: Text('Error: ${state.message}'));
         }
@@ -1472,106 +1509,279 @@ class _BookContentPageState extends State<BookContentPage>
     );
   }
 
-  Widget _buildImageGallery(List<dynamic> imageContents) {
-    return ListView.builder(
-      padding: EdgeInsets.all(20.w),
-      itemCount: imageContents.length,
-      itemBuilder: (context, index) {
-        final image = imageContents[index];
-        return _buildImageCard(image);
+  Widget _buildImageCardStack(List<dynamic> imageContents) {
+    return _ImageCardStackWidget(imageContents: imageContents);
+  }
+}
+
+class _ImageCardStackWidget extends StatefulWidget {
+  final List<dynamic> imageContents;
+
+  const _ImageCardStackWidget({required this.imageContents});
+
+  @override
+  State<_ImageCardStackWidget> createState() => _ImageCardStackWidgetState();
+}
+
+class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+  int _currentIndex = 0;
+  double _dragDistance = 0.0;
+  bool _isDragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onPanStart: (details) {
+        _isDragging = true;
+      },
+      onPanUpdate: (details) {
+        if (_isDragging) {
+          setState(() {
+            _dragDistance += details.delta.dx;
+          });
+        }
+      },
+      onPanEnd: (details) {
+        _isDragging = false;
+
+        // Determine swipe direction and velocity
+        final velocity = details.velocity.pixelsPerSecond.dx;
+        final dragThreshold = 100.0;
+
+        if (_dragDistance.abs() > dragThreshold || velocity.abs() > 500) {
+          if (_dragDistance > 0 || velocity > 0) {
+            // Swipe right - previous image
+            _previousImage();
+          } else {
+            // Swipe left - next image
+            _nextImage();
+          }
+        }
+
+        // Reset drag distance
+        setState(() {
+          _dragDistance = 0.0;
+        });
+      },
+      child: SizedBox(
+        width: double.infinity,
+        height: double.infinity,
+        child: Stack(
+          children: [
+            // Background cards (stacked behind)
+            ..._buildBackgroundCards(),
+
+            // Main card (on top)
+            _buildMainCard(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildBackgroundCards() {
+    final cards = <Widget>[];
+    final maxBackgroundCards = math.min(3, widget.imageContents.length - 1);
+
+    for (int i = 1; i <= maxBackgroundCards; i++) {
+      final cardIndex = (_currentIndex + i) % widget.imageContents.length;
+      final scale = 1.0 - (i * 0.02); // Each card is 2% smaller
+      final offset = i * 20.0; // Each card is offset by 20px
+
+      cards.add(
+        Positioned(
+          top: offset,
+          left: offset,
+          right: offset,
+          bottom: offset,
+          child: Transform.scale(
+            scale: scale,
+            child: _buildCard(
+              widget.imageContents[cardIndex],
+              opacity: 0.7 - (i * 0.1), // Much more visible opacity
+              isBackground: true,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return cards.reversed.toList(); // Reverse to show cards in correct order
+  }
+
+  Widget _buildMainCard() {
+    final currentImage = widget.imageContents[_currentIndex];
+    final rotation = _dragDistance * 0.001; // Convert drag distance to rotation
+    final opacity = math.max(0.0, 1.0 - (_dragDistance.abs() * 0.002));
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(_dragDistance, 0),
+          child: Transform.rotate(
+            angle: rotation,
+            child: Opacity(opacity: opacity, child: _buildCard(currentImage)),
+          ),
+        );
       },
     );
   }
 
-  Widget _buildImageCard(dynamic image) {
+  Widget _buildCard(
+    dynamic image, {
+    double opacity = 1.0,
+    bool isBackground = false,
+  }) {
     return Container(
-      margin: EdgeInsets.only(bottom: 16.h),
-      child: GestureDetector(
-        onTap: () {
-          // TODO: Implement image viewer
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Viewing: ${image.title}')));
-        },
-        child: Container(
-          height: 200.h,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+      margin: EdgeInsets.only(top: 10.h, bottom: 40.h, left: 20.w, right: 20.w),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.all(Radius.circular(20.r)),
+        color: isBackground ? Colors.white.withOpacity(0.1) : null,
+        border:
+            isBackground
+                ? Border.all(color: Colors.white.withOpacity(0.6), width: 2.0)
+                : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12.r),
-            child: Stack(
-              children: [
-                // Image
-                Positioned.fill(
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: Icon(
-                      Icons.image,
-                      size: 64.sp,
-                      color: Colors.grey[400],
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.all(Radius.circular(20.r)),
+        child: Stack(
+          children: [
+            // Image
+            Image.network(
+              image.fileUrl ?? '',
+              width: double.infinity,
+              height: double.infinity,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  color: Colors.grey[300],
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value:
+                          loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                      color: Colors.grey[600],
                     ),
                   ),
-                ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  color: Colors.grey[300],
+                  child: const Center(
+                    child: Icon(
+                      Icons.image_not_supported,
+                      size: 100,
+                      color: Colors.grey,
+                    ),
+                  ),
+                );
+              },
+            ),
 
-                // Image Info
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: EdgeInsets.all(16.w),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Colors.black.withOpacity(0.8),
-                          Colors.transparent,
-                        ],
+            // Bottom overlay
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      image.title,
+                      style: TextStyle(
+                        fontFamily: 'SFPro',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 18.sp,
+                        color: Colors.white,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // SizedBox(height: 8.h),
+                    // Text(
+                    //   'File Size: ${image.fileSizeMb.toStringAsFixed(1)} MB',
+                    //   style: TextStyle(
+                    //     fontFamily: 'SFPro',
+                    //     fontWeight: FontWeight.w500,
+                    //     fontSize: 14.sp,
+                    //     color: Colors.white70,
+                    //   ),
+                    // ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      'Image ${_currentIndex + 1} of ${widget.imageContents.length}',
+                      style: TextStyle(
+                        fontFamily: 'SFPro',
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14.sp,
+                        color: Colors.white70,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          image.title,
-                          style: TextStyle(
-                            fontFamily: 'SFPro',
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16.sp,
-                            color: Colors.white,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          'File Size: ${image.fileSizeMb.toStringAsFixed(1)} MB',
-                          style: TextStyle(
-                            fontFamily: 'SFPro',
-                            fontWeight: FontWeight.w500,
-                            fontSize: 14.sp,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
+  }
+
+  void _nextImage() {
+    setState(() {
+      _currentIndex = (_currentIndex + 1) % widget.imageContents.length;
+    });
+  }
+
+  void _previousImage() {
+    setState(() {
+      _currentIndex =
+          _currentIndex == 0
+              ? widget.imageContents.length - 1
+              : _currentIndex - 1;
+    });
   }
 }

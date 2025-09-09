@@ -234,17 +234,17 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
 
                   SizedBox(height: 20.h),
 
-                  // Swipe Hint
-                  Text(
-                    'Swipe left/right to change tracks',
-                    style: TextStyle(
-                      fontFamily: 'SFPro',
-                      fontWeight: FontWeight.w400,
-                      fontSize: 12.sp,
-                      color: Colors.white.withOpacity(0.6),
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  // // Swipe Hint
+                  // Text(
+                  //   'Swipe left/right to change tracks',
+                  //   style: TextStyle(
+                  //     fontFamily: 'SFPro',
+                  //     fontWeight: FontWeight.w400,
+                  //     fontSize: 12.sp,
+                  //     color: Colors.white.withOpacity(0.6),
+                  //   ),
+                  //   textAlign: TextAlign.center,
+                  // ),
                 ],
               ),
             ),

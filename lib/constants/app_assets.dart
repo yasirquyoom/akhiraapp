@@ -17,4 +17,13 @@ class AppAssets {
   static const String iconVideo = 'assets/images/videos.png';
   static const String iconImages = 'assets/images/images.png';
   static const String iconQuiz = 'assets/images/quiz.png';
+
+  // Account Page Icons
+  static const String iconFacebook = 'assets/images/facebook.png';
+  static const String iconInstagram = 'assets/images/instagram.png';
+  static const String iconLogout = 'assets/images/logout.png';
+  static const String iconPrivacyPolicy = 'assets/images/privacy_policy.png';
+  static const String iconRating = 'assets/images/rating.png';
+  static const String iconShare = 'assets/images/share.png';
+  static const String iconTelegram = 'assets/images/telegram.png';
 }

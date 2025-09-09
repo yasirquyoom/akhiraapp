@@ -103,6 +103,7 @@ class AudioError extends AudioState {
 // Cubit
 class AudioCubit extends Cubit<AudioState> {
   final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isUserSeeking = false;
 
   AudioCubit() : super(AudioInitial()) {
     _loadAudioTracks();
@@ -119,7 +120,7 @@ class AudioCubit extends Cubit<AudioState> {
     });
 
     _audioPlayer.onPositionChanged.listen((position) {
-      if (state is AudioLoaded) {
+      if (state is AudioLoaded && !_isUserSeeking) {
         final currentState = state as AudioLoaded;
         emit(currentState.copyWith(currentPosition: position));
       }
@@ -299,10 +300,22 @@ class AudioCubit extends Cubit<AudioState> {
     }
   }
 
-  void updatePosition(Duration position) {
+  void updatePosition(Duration position) async {
     if (state is AudioLoaded) {
-      final currentState = state as AudioLoaded;
-      emit(currentState.copyWith(currentPosition: position));
+      try {
+        _isUserSeeking = true;
+        final currentState = state as AudioLoaded;
+        emit(currentState.copyWith(currentPosition: position));
+        await _audioPlayer.seek(position);
+
+        // Reset the flag after a short delay to allow position updates to resume
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _isUserSeeking = false;
+        });
+      } catch (e) {
+        print('Error updating position: $e');
+        _isUserSeeking = false;
+      }
     }
   }
 
@@ -335,7 +348,22 @@ class AudioCubit extends Cubit<AudioState> {
   }
 
   void seekTo(Duration position) async {
-    await _audioPlayer.seek(position);
+    if (state is AudioLoaded) {
+      try {
+        _isUserSeeking = true;
+        final currentState = state as AudioLoaded;
+        emit(currentState.copyWith(currentPosition: position));
+        await _audioPlayer.seek(position);
+
+        // Reset the flag after a short delay to allow position updates to resume
+        Future.delayed(const Duration(milliseconds: 100), () {
+          _isUserSeeking = false;
+        });
+      } catch (e) {
+        print('Error seeking to position: $e');
+        _isUserSeeking = false;
+      }
+    }
   }
 
   @override
