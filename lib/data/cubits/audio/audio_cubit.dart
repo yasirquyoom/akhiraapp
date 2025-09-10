@@ -306,6 +306,7 @@ class AudioCubit extends Cubit<AudioState> {
             );
         print('Started playing audio (stream)');
         _startPositionTicker();
+        await _refreshDurationFromPlayer();
       } on Object catch (streamErr) {
         print('Stream play failed: $streamErr');
         // Fallback: download to temp and play as local file (iOS AVPlayer may fail some URLs)
@@ -329,6 +330,7 @@ class AudioCubit extends Cubit<AudioState> {
               );
           print('Started playing audio (local)');
           _startPositionTicker();
+          await _refreshDurationFromPlayer();
         } on Object catch (localErr) {
           print('Local play failed: $localErr');
           // Final fallback: play from bytes
@@ -348,6 +350,7 @@ class AudioCubit extends Cubit<AudioState> {
               );
           print('Started playing audio (bytes)');
           _startPositionTicker();
+          await _refreshDurationFromPlayer();
         }
       }
 
@@ -383,6 +386,7 @@ class AudioCubit extends Cubit<AudioState> {
         print('Attempting sample fallback playback: $sampleUrl');
         await _audioPlayer.play(UrlSource(sampleUrl));
         _startPositionTicker();
+        await _refreshDurationFromPlayer();
 
         if (state is AudioLoaded) {
           final s = state as AudioLoaded;
@@ -430,6 +434,21 @@ class AudioCubit extends Cubit<AudioState> {
   void _stopPositionTicker() {
     _positionTicker?.cancel();
     _positionTicker = null;
+  }
+
+  Future<void> _refreshDurationFromPlayer() async {
+    try {
+      final d = await _audioPlayer.getDuration();
+      if (d == null) return;
+      if (state is AudioLoaded) {
+        final s = state as AudioLoaded;
+        if (s.totalDuration != d) {
+          emit(s.copyWith(totalDuration: d));
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
   }
 
   // Helpers
