@@ -297,21 +297,43 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
             overlayColor: Colors.white.withOpacity(0.2),
             trackHeight: 4.h,
           ),
-          child: Slider(
-            value:
-                state.currentPosition.inMilliseconds /
-                (state.totalDuration.inMilliseconds > 0
-                    ? state.totalDuration.inMilliseconds
-                    : 1),
-            onChanged: (value) {
-              final newPosition = Duration(
-                milliseconds:
-                    (value * state.totalDuration.inMilliseconds).round(),
+          child: Builder(
+            builder: (_) {
+              final totalSec = state.totalDuration.inSeconds;
+              final posSec = state.currentPosition.inSeconds;
+              final hasDuration = totalSec > 0;
+              final maxValue = hasDuration ? totalSec.toDouble() : 1.0;
+              final rawValue = hasDuration ? posSec.toDouble() : 0.0;
+              final clampedValue = rawValue.clamp(0.0, maxValue);
+
+              return Slider(
+                value: clampedValue,
+                onChangeStart:
+                    hasDuration
+                        ? (value) {
+                          context.read<AudioCubit>().beginUserSeek();
+                        }
+                        : null,
+                onChanged:
+                    hasDuration
+                        ? (value) {
+                          final newPosition = Duration(seconds: value.round());
+                          context.read<AudioCubit>().previewSeekPosition(
+                            newPosition,
+                          );
+                        }
+                        : null,
+                onChangeEnd:
+                    hasDuration
+                        ? (value) {
+                          final newPosition = Duration(seconds: value.round());
+                          context.read<AudioCubit>().endUserSeek(newPosition);
+                        }
+                        : null,
+                min: 0.0,
+                max: maxValue,
               );
-              context.read<AudioCubit>().updatePosition(newPosition);
             },
-            min: 0.0,
-            max: 1.0,
           ),
         ),
 

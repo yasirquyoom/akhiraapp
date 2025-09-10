@@ -109,6 +109,7 @@ class AudioError extends AudioState {
 class AudioCubit extends Cubit<AudioState> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isUserSeeking = false;
+  Timer? _positionTicker;
 
   AudioCubit() : super(AudioInitial()) {
     _setupAudioPlayer();
@@ -160,6 +161,13 @@ class AudioCubit extends Cubit<AudioState> {
         print('Updating isPlaying to: $isPlaying');
         emit(currentState.copyWith(isPlaying: isPlaying));
       }
+
+      // Manage manual ticker alongside native position events
+      if (playerState == PlayerState.playing) {
+        _startPositionTicker();
+      } else {
+        _stopPositionTicker();
+      }
     });
 
     _audioPlayer.onPlayerComplete.listen((event) {
@@ -169,6 +177,7 @@ class AudioCubit extends Cubit<AudioState> {
         // Reset to start and pause after completion
         _audioPlayer.seek(Duration.zero);
         _audioPlayer.pause();
+        _stopPositionTicker();
         emit(
           currentState.copyWith(
             isPlaying: false,
@@ -296,6 +305,7 @@ class AudioCubit extends Cubit<AudioState> {
               },
             );
         print('Started playing audio (stream)');
+        _startPositionTicker();
       } on Object catch (streamErr) {
         print('Stream play failed: $streamErr');
         // Fallback: download to temp and play as local file (iOS AVPlayer may fail some URLs)
@@ -318,6 +328,7 @@ class AudioCubit extends Cubit<AudioState> {
                 },
               );
           print('Started playing audio (local)');
+          _startPositionTicker();
         } on Object catch (localErr) {
           print('Local play failed: $localErr');
           // Final fallback: play from bytes
@@ -336,6 +347,7 @@ class AudioCubit extends Cubit<AudioState> {
                 },
               );
           print('Started playing audio (bytes)');
+          _startPositionTicker();
         }
       }
 
@@ -370,6 +382,7 @@ class AudioCubit extends Cubit<AudioState> {
             'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
         print('Attempting sample fallback playback: $sampleUrl');
         await _audioPlayer.play(UrlSource(sampleUrl));
+        _startPositionTicker();
 
         if (state is AudioLoaded) {
           final s = state as AudioLoaded;
@@ -396,6 +409,27 @@ class AudioCubit extends Cubit<AudioState> {
 
       emit(AudioError(message: errorMessage));
     }
+  }
+
+  void _startPositionTicker() {
+    _stopPositionTicker();
+    _positionTicker = Timer.periodic(const Duration(milliseconds: 250), (
+      _,
+    ) async {
+      if (_isUserSeeking) return;
+      if (state is! AudioLoaded) return;
+      try {
+        final pos = await _audioPlayer.getCurrentPosition();
+        if (pos == null) return;
+        final currentState = state as AudioLoaded;
+        emit(currentState.copyWith(currentPosition: pos));
+      } catch (_) {}
+    });
+  }
+
+  void _stopPositionTicker() {
+    _positionTicker?.cancel();
+    _positionTicker = null;
   }
 
   // Helpers
@@ -493,6 +527,34 @@ class AudioCubit extends Cubit<AudioState> {
         print('Error updating position: $e');
         _isUserSeeking = false;
       }
+    }
+  }
+
+  // Seeking helpers for smoother scrubbing
+  void beginUserSeek() {
+    _isUserSeeking = true;
+  }
+
+  void previewSeekPosition(Duration position) {
+    if (state is AudioLoaded) {
+      final currentState = state as AudioLoaded;
+      emit(currentState.copyWith(currentPosition: position));
+    }
+  }
+
+  Future<void> endUserSeek(Duration position) async {
+    if (state is AudioLoaded) {
+      try {
+        final currentState = state as AudioLoaded;
+        emit(currentState.copyWith(currentPosition: position));
+        await _audioPlayer.seek(position);
+      } catch (e) {
+        print('Error ending user seek: $e');
+      } finally {
+        _isUserSeeking = false;
+      }
+    } else {
+      _isUserSeeking = false;
     }
   }
 
