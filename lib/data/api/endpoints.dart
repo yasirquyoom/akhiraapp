@@ -20,4 +20,9 @@ class Endpoints {
   // Quiz
   static String bookQuizzes(String bookId) =>
       '/user/collections/book/$bookId/quizzes';
+
+  // Quiz actions
+  static const String submitQuizAnswer = '/user/quiz/submit-answer';
+  static String quizScore(String bookId) => '/user/quiz/book/$bookId/score';
+  static String quizReset(String bookId) => '/user/quiz/book/$bookId/reset';
 }

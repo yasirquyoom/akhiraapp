@@ -39,4 +39,22 @@ class QuizRepository {
       throw Exception('An unexpected error occurred');
     }
   }
+
+  Future<Response> submitAnswer({
+    required String quizId,
+    required String userAnswer,
+  }) async {
+    return _dioClient.post(
+      Endpoints.submitQuizAnswer,
+      data: {'quiz_id': quizId, 'user_answer': userAnswer},
+    );
+  }
+
+  Future<Response> getScore({required String bookId}) {
+    return _dioClient.get(Endpoints.quizScore(bookId));
+  }
+
+  Future<Response> resetAnswers({required String bookId}) {
+    return _dioClient.delete(Endpoints.quizReset(bookId));
+  }
 }

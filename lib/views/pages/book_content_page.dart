@@ -77,15 +77,24 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   void _loadAllBookContent() {
-    // Get book ID from global state first, fallback to widget parameter
+    // Prefer widget parameter if provided, then fallback to global state
     final bookCubit = context.read<BookCubit>();
-    String? bookId = bookCubit.getCurrentBookId();
+    String? bookId =
+        (widget.bookId != null && widget.bookId!.isNotEmpty)
+            ? widget.bookId
+            : bookCubit.getCurrentBookId();
 
-    // If no book ID in global state, try widget parameter
-    if (bookId == null && widget.bookId != null && widget.bookId!.isNotEmpty) {
-      bookId = widget.bookId;
-      // Set it in global state for future use
-      bookCubit.setBook(bookId: bookId!, bookTitle: 'Unknown Book');
+    // Update global if different and clear cache to avoid stale UI
+    if (bookId != null && bookId.isNotEmpty) {
+      final currentGlobal = bookCubit.getCurrentBookId();
+      if (currentGlobal != bookId) {
+        bookCubit.setBook(bookId: bookId, bookTitle: 'Unknown Book');
+        context.read<BookContentCubit>().clearCache();
+        // Reset quiz state so questions load for the newly selected book
+        if (mounted) {
+          context.read<QuizCubit>().restartQuiz();
+        }
+      }
     }
 
     if (bookId == null || bookId.isEmpty) {
@@ -95,17 +104,19 @@ class _BookContentPageState extends State<BookContentPage>
 
     print('Loading all content for bookId: $bookId');
     context.read<BookContentCubit>().loadAllBookContent(bookId: bookId);
+
+    // Also ensure quiz APIs load for this book on page entry
+    // (score first inside cubit, then quizzes)
+    context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
   }
 
   void _filterContentForCurrentTab() {
-    // Get book ID from global state first, fallback to widget parameter
+    // Prefer widget parameter if provided, then fallback to global state
     final bookCubit = context.read<BookCubit>();
-    String? bookId = bookCubit.getCurrentBookId();
-
-    // If no book ID in global state, try widget parameter
-    if (bookId == null && widget.bookId != null && widget.bookId!.isNotEmpty) {
-      bookId = widget.bookId;
-    }
+    String? bookId =
+        (widget.bookId != null && widget.bookId!.isNotEmpty)
+            ? widget.bookId
+            : bookCubit.getCurrentBookId();
 
     if (bookId == null || bookId.isEmpty) {
       print('Warning: Book ID is null or empty, cannot filter content');
@@ -139,14 +150,12 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   void _refreshCurrentTabContent() {
-    // Get book ID from global state first, fallback to widget parameter
+    // Prefer widget parameter if provided, then fallback to global state
     final bookCubit = context.read<BookCubit>();
-    String? bookId = bookCubit.getCurrentBookId();
-
-    // If no book ID in global state, try widget parameter
-    if (bookId == null && widget.bookId != null && widget.bookId!.isNotEmpty) {
-      bookId = widget.bookId;
-    }
+    String? bookId =
+        (widget.bookId != null && widget.bookId!.isNotEmpty)
+            ? widget.bookId
+            : bookCubit.getCurrentBookId();
 
     if (bookId == null || bookId.isEmpty) {
       print('Warning: Book ID is null or empty, cannot refresh content');
@@ -728,9 +737,12 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildQuizTab() {
-    // Check if bookId is available in global state
+    // Prefer widget parameter if provided, then fallback to global state
     final bookCubit = context.read<BookCubit>();
-    final bookId = bookCubit.getCurrentBookId();
+    final bookId =
+        (widget.bookId != null && widget.bookId!.isNotEmpty)
+            ? widget.bookId
+            : bookCubit.getCurrentBookId();
 
     if (bookId == null || bookId.isEmpty) {
       return Center(
@@ -768,9 +780,26 @@ class _BookContentPageState extends State<BookContentPage>
         if (state is QuizLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is QuizLoaded) {
-          return _buildQuizContent(state);
+          final completedByApi =
+              state.remainingQuestions == 0 &&
+              (state.totalQuestionsFromApi > 0 || state.totalAttempted > 0);
+          if (completedByApi) {
+            return _buildScoreCardOnly(state, bookId);
+          }
+          // Avoid RangeError if questions not yet loaded
+          if (state.questions.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final allAnswered =
+              state.totalAttempted >= state.totalQuestions &&
+              state.totalQuestions > 0;
+          if (allAnswered) {
+            return _buildScoreCardOnly(state, bookId);
+          }
+          return _buildQuizContent(state, bookId);
         } else if (state is QuizCompleted) {
-          return _buildQuizCompleted(state);
+          // We no longer use this visual path; defer to Loaded score card logic
+          return const SizedBox.shrink();
         } else if (state is QuizError) {
           return Center(
             child: Column(
@@ -806,7 +835,107 @@ class _BookContentPageState extends State<BookContentPage>
     );
   }
 
-  Widget _buildQuizContent(QuizLoaded state) {
+  Widget _buildScoreCardOnly(QuizLoaded state, String bookId) {
+    return Padding(
+      padding: EdgeInsets.all(20.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.all(30.w),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primary, AppColors.primaryGradientEnd],
+              ),
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _languageManager.getText('Quiz Score', 'Score du Quiz'),
+                  style: TextStyle(
+                    fontFamily: 'SFPro',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 20.sp,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            '${state.marksEarned}',
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 28.sp,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            _languageManager.getText('Marks', 'Points'),
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 5,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Text(
+                            '${state.totalAttempted}/${state.totalQuestions}',
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 28.sp,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            _languageManager.getText('Attempted', 'Tentées'),
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  '${state.percentage.toStringAsFixed(2)}%',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16.h),
+          ElevatedButton(
+            onPressed: () => context.read<QuizCubit>().resetBookAnswers(bookId),
+            child: Text(
+              _languageManager.getText('Reset Answers', 'Réinitialiser'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuizContent(QuizLoaded state, String bookId) {
     return Stack(
       children: [
         // Main quiz content
@@ -834,7 +963,7 @@ class _BookContentPageState extends State<BookContentPage>
                       child: Column(
                         children: [
                           Text(
-                            '${state.correctAnswers}',
+                            '${state.marksEarned}',
                             style: TextStyle(
                               fontFamily: 'SFPro',
                               fontWeight: FontWeight.w700,
@@ -843,7 +972,7 @@ class _BookContentPageState extends State<BookContentPage>
                             ),
                           ),
                           Text(
-                            _languageManager.getText('My score', 'Mon score'),
+                            _languageManager.getText('Marks', 'Points'),
                             style: TextStyle(
                               fontFamily: 'SFPro',
                               fontWeight: FontWeight.w500,
@@ -868,7 +997,7 @@ class _BookContentPageState extends State<BookContentPage>
                       child: Column(
                         children: [
                           Text(
-                            '${state.currentQuestionIndex + 1}/${state.totalQuestions}',
+                            '${state.totalAttempted}/${state.totalQuestions}',
                             style: TextStyle(
                               fontFamily: 'SFPro',
                               fontWeight: FontWeight.w700,
@@ -877,7 +1006,7 @@ class _BookContentPageState extends State<BookContentPage>
                             ),
                           ),
                           Text(
-                            _languageManager.getText('Questions', 'Questions'),
+                            _languageManager.getText('Attempted', 'Tentées'),
                             style: TextStyle(
                               fontFamily: 'SFPro',
                               fontWeight: FontWeight.w500,
@@ -960,8 +1089,10 @@ class _BookContentPageState extends State<BookContentPage>
                       onPressed:
                           state.selectedOptionId != null
                               ? () {
-                                context.read<QuizCubit>().submitAnswer();
-                                context.read<QuizCubit>().nextQuestion();
+                                final cubit = context.read<QuizCubit>();
+                                cubit.submitAnswer();
+                                cubit.refreshBookScore(bookId);
+                                cubit.nextQuestion();
                               }
                               : null,
                       style: ElevatedButton.styleFrom(

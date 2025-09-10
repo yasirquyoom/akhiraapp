@@ -76,6 +76,12 @@ class QuizLoaded extends QuizState {
   final List<QuizAnswer> answers;
   final String? selectedOptionId;
   final int score;
+  final int totalAttempted;
+  final int totalPossibleMarks;
+  final int marksEarned;
+  final double percentage;
+  final int remainingQuestions;
+  final int totalQuestionsFromApi;
 
   const QuizLoaded({
     required this.questions,
@@ -83,6 +89,12 @@ class QuizLoaded extends QuizState {
     this.answers = const [],
     this.selectedOptionId,
     this.score = 0,
+    this.totalAttempted = 0,
+    this.totalPossibleMarks = 0,
+    this.marksEarned = 0,
+    this.percentage = 0,
+    this.remainingQuestions = 0,
+    this.totalQuestionsFromApi = 0,
   });
 
   QuizLoaded copyWith({
@@ -91,6 +103,12 @@ class QuizLoaded extends QuizState {
     List<QuizAnswer>? answers,
     String? selectedOptionId,
     int? score,
+    int? totalAttempted,
+    int? totalPossibleMarks,
+    int? marksEarned,
+    double? percentage,
+    int? remainingQuestions,
+    int? totalQuestionsFromApi,
   }) {
     return QuizLoaded(
       questions: questions ?? this.questions,
@@ -98,6 +116,13 @@ class QuizLoaded extends QuizState {
       answers: answers ?? this.answers,
       selectedOptionId: selectedOptionId ?? this.selectedOptionId,
       score: score ?? this.score,
+      totalAttempted: totalAttempted ?? this.totalAttempted,
+      totalPossibleMarks: totalPossibleMarks ?? this.totalPossibleMarks,
+      marksEarned: marksEarned ?? this.marksEarned,
+      percentage: percentage ?? this.percentage,
+      remainingQuestions: remainingQuestions ?? this.remainingQuestions,
+      totalQuestionsFromApi:
+          totalQuestionsFromApi ?? this.totalQuestionsFromApi,
     );
   }
 
@@ -114,6 +139,12 @@ class QuizLoaded extends QuizState {
     answers,
     selectedOptionId,
     score,
+    totalAttempted,
+    totalPossibleMarks,
+    marksEarned,
+    percentage,
+    remainingQuestions,
+    totalQuestionsFromApi,
   ];
 }
 
@@ -153,6 +184,24 @@ class QuizCubit extends Cubit<QuizState> {
     emit(QuizLoading());
 
     try {
+      // Fetch score first to know completion state immediately
+      try {
+        final scoreResp = await _repository.getScore(bookId: bookId);
+        final data = scoreResp.data['data'];
+        // Temporarily emit a loaded state with score-only to avoid flicker
+        emit(
+          QuizLoaded(
+            questions: const [],
+            totalAttempted: data['questions_attempted'] ?? 0,
+            totalPossibleMarks: data['total_possible_marks'] ?? 0,
+            marksEarned: data['marks_earned'] ?? 0,
+            percentage: (data['percentage'] ?? 0).toDouble(),
+            remainingQuestions: data['remaining_questions'] ?? 0,
+            totalQuestionsFromApi: data['total_questions'] ?? 0,
+          ),
+        );
+      } catch (_) {}
+
       final response = await _repository.getBookQuizzes(bookId: bookId);
 
       if (response.status == 200 && response.data != null) {
@@ -169,7 +218,20 @@ class QuizCubit extends Cubit<QuizState> {
         }
 
         if (questions.isNotEmpty) {
-          emit(QuizLoaded(questions: questions));
+          // Merge with any existing score data already emitted
+          final prev = state is QuizLoaded ? state as QuizLoaded : null;
+          emit(
+            QuizLoaded(
+              questions: questions,
+              totalAttempted: prev?.totalAttempted ?? 0,
+              totalPossibleMarks: prev?.totalPossibleMarks ?? 0,
+              marksEarned: prev?.marksEarned ?? 0,
+              percentage: prev?.percentage ?? 0,
+              remainingQuestions: prev?.remainingQuestions ?? 0,
+              totalQuestionsFromApi:
+                  prev?.totalQuestionsFromApi ?? questions.length,
+            ),
+          );
         } else {
           emit(QuizInitial());
         }
@@ -213,46 +275,87 @@ class QuizCubit extends Cubit<QuizState> {
   }
 
   void submitAnswer() {
-    if (state is QuizLoaded) {
+    if (state is! QuizLoaded) return;
+    final currentState = state as QuizLoaded;
+    final selected = currentState.selectedOptionId;
+    if (selected == null) return;
+
+    // Optimistic update for instant UX
+    final isCorrect = selected == currentState.currentQuestion.correctAnswerId;
+    final optimisticAnswer = QuizAnswer(
+      questionId: currentState.currentQuestion.id,
+      selectedOptionId: selected,
+      isCorrect: isCorrect,
+      answeredAt: DateTime.now(),
+    );
+    final optimisticAnswers = [...currentState.answers, optimisticAnswer];
+    emit(
+      currentState.copyWith(
+        answers: optimisticAnswers,
+        selectedOptionId: null,
+        score: optimisticAnswers.where((a) => a.isCorrect).length,
+      ),
+    );
+
+    // Send to API, then refresh score
+    _repository
+        .submitAnswer(
+          quizId: currentState.currentQuestion.id,
+          userAnswer: selected,
+        )
+        .then((_) => _refreshScore())
+        .catchError((_) => null);
+  }
+
+  Future<void> _refreshScore() async {
+    if (state is! QuizLoaded) return;
+    try {
+      // Infer book id from questions payload? Not available here; handled by UI passing cubit action can be extended.
+      // For now, do nothing if not available.
+    } catch (_) {}
+  }
+
+  Future<void> refreshBookScore(String bookId) async {
+    if (state is! QuizLoaded) return;
+    try {
+      final resp = await _repository.getScore(bookId: bookId);
+      final data = resp.data['data'];
       final currentState = state as QuizLoaded;
-      if (currentState.selectedOptionId == null) return;
-
-      final isCorrect =
-          currentState.selectedOptionId ==
-          currentState.currentQuestion.correctAnswerId;
-      final newAnswer = QuizAnswer(
-        questionId: currentState.currentQuestion.id,
-        selectedOptionId: currentState.selectedOptionId!,
-        isCorrect: isCorrect,
-        answeredAt: DateTime.now(),
-      );
-
-      final updatedAnswers = [...currentState.answers, newAnswer];
-      final newScore =
-          updatedAnswers.where((answer) => answer.isCorrect).length;
-
       emit(
         currentState.copyWith(
-          answers: updatedAnswers,
-          selectedOptionId: null,
-          score: newScore,
+          totalAttempted:
+              data['questions_attempted'] ?? currentState.totalAttempted,
+          totalPossibleMarks:
+              data['total_possible_marks'] ?? currentState.totalPossibleMarks,
+          marksEarned: data['marks_earned'] ?? currentState.marksEarned,
+          percentage:
+              (data['percentage'] ?? currentState.percentage).toDouble(),
+          remainingQuestions:
+              data['remaining_questions'] ?? currentState.remainingQuestions,
+          totalQuestionsFromApi:
+              data['total_questions'] ?? currentState.totalQuestionsFromApi,
         ),
       );
+    } catch (_) {
+      // ignore
     }
+  }
+
+  Future<void> resetBookAnswers(String bookId) async {
+    try {
+      await _repository.resetAnswers(bookId: bookId);
+      // After reset, reload quizzes and score so the quiz appears again
+      await loadQuizzesFromApi(bookId: bookId);
+    } catch (_) {}
   }
 
   void nextQuestion() {
     if (state is QuizLoaded) {
       final currentState = state as QuizLoaded;
       if (currentState.isLastQuestion) {
-        emit(
-          QuizCompleted(
-            questions: currentState.questions,
-            answers: currentState.answers,
-            score: currentState.score,
-            totalQuestions: currentState.totalQuestions,
-          ),
-        );
+        // Do not emit a separate completed state; UI will show
+        // the score card based on API score/remaining_questions.
+        return;
       } else {
         // Get the selected option for the next question if it was already answered
         final nextQuestionIndex = currentState.currentQuestionIndex + 1;
