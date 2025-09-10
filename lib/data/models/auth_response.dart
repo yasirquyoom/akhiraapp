@@ -47,10 +47,13 @@ class AuthData extends Equatable {
       tokenType: json['token_type'] as String?,
       expiresIn: json['expires_in'] as int?,
       user: json['user'] != null ? User.fromJson(json['user']) : null,
-      userId: json['user']?['user_id'] as String?,
-      name: json['user']?['name'] as String?,
-      email: json['user']?['email'] as String?,
-      createdAt: json['user']?['created_at'] as String?,
+      // Handle both login response (user nested) and registration response (user data directly)
+      userId: json['user']?['user_id'] as String? ?? json['user_id'] as String?,
+      name: json['user']?['name'] as String? ?? json['name'] as String?,
+      email: json['user']?['email'] as String? ?? json['email'] as String?,
+      createdAt:
+          json['user']?['created_at'] as String? ??
+          json['created_at'] as String?,
     );
   }
 

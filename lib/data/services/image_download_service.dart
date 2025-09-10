@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
+import 'package:gal/gal.dart';
 
 class ImageDownloadService {
   final Dio _dio = Dio();
@@ -24,18 +24,12 @@ class ImageDownloadService {
 
       final bytes = response.data as Uint8List;
 
-      // Save to gallery
-      final result = await ImageGallerySaver.saveImage(
-        bytes,
-        quality: 100,
-        name: 'akhira_image_${DateTime.now().millisecondsSinceEpoch}',
-      );
+      // Save to gallery using gal package
+      final fileName =
+          'akhira_image_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await Gal.putImageBytes(bytes, name: fileName);
 
-      if (result['isSuccess'] == true) {
-        return result['filePath'] ?? 'Image saved successfully';
-      } else {
-        throw Exception('Failed to save image to gallery');
-      }
+      return 'Image saved successfully';
     } catch (e) {
       throw Exception('Download failed: $e');
     }

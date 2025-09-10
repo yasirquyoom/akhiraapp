@@ -59,7 +59,8 @@ class CustomButton extends StatelessWidget {
             gradient: gradient,
             borderRadius: BorderRadius.circular(25),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          height: 50,
           child: DefaultTextStyle(
             style: const TextStyle(
               color: Colors.white,
@@ -81,6 +82,9 @@ class CustomButton extends StatelessWidget {
           ),
           backgroundColor: backgroundColor,
           foregroundColor: textColor,
+          disabledBackgroundColor: backgroundColor,
+          disabledForegroundColor: textColor,
+          minimumSize: const Size(double.infinity, 50),
         ),
         child: child,
       );

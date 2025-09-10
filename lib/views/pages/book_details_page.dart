@@ -59,9 +59,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
         final homeState = homeCubit.state as HomeLoaded;
         final bookId = state.bookId;
         try {
-          return homeState.books.firstWhere(
-            (book) => book.id == bookId,
-          );
+          return homeState.books.firstWhere((book) => book.id == bookId);
         } catch (e) {
           // If book not found in home state, create a basic book model
           return BookModel(
@@ -84,8 +82,9 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
       builder: (context, state) {
         // Get book data from widget or global state
         final book = widget.book ?? _getBookFromState(state);
-        final bookTitle = book?.title ?? (state is BookLoaded ? state.bookTitle : null);
-        
+        final bookTitle =
+            book?.title ?? (state is BookLoaded ? state.bookTitle : null);
+
         return Scaffold(
           backgroundColor: Colors.grey.shade100,
           appBar: AppBar(
@@ -234,10 +233,10 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
                     bookId: book!.id,
-                    bookTitle: book!.title,
+                    bookTitle: book.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=0&bookId=${book!.id}',
+                    '${AppRoutes.bookContent}?tab=0&bookId=${book.id}',
                   );
                 },
               ),
@@ -254,10 +253,10 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
                     bookId: book!.id,
-                    bookTitle: book!.title,
+                    bookTitle: book.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=1&bookId=${book!.id}',
+                    '${AppRoutes.bookContent}?tab=1&bookId=${book.id}',
                   );
                 },
               ),
@@ -279,10 +278,10 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
                     bookId: book!.id,
-                    bookTitle: book!.title,
+                    bookTitle: book.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=2&bookId=${book!.id}',
+                    '${AppRoutes.bookContent}?tab=2&bookId=${book.id}',
                   );
                 },
               ),
@@ -299,10 +298,10 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                   // Set book ID in global state
                   context.read<BookCubit>().setBook(
                     bookId: book!.id,
-                    bookTitle: book!.title,
+                    bookTitle: book.title,
                   );
                   context.push(
-                    '${AppRoutes.bookContent}?tab=3&bookId=${book!.id}',
+                    '${AppRoutes.bookContent}?tab=3&bookId=${book.id}',
                   );
                 },
               ),
@@ -319,11 +318,9 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             // Set book ID in global state
             context.read<BookCubit>().setBook(
               bookId: book!.id,
-              bookTitle: book!.title,
+              bookTitle: book.title,
             );
-            context.push(
-              '${AppRoutes.bookContent}?tab=4&bookId=${book!.id}',
-            );
+            context.push('${AppRoutes.bookContent}?tab=4&bookId=${book.id}');
           },
           child: Container(
             padding: const EdgeInsets.all(20),

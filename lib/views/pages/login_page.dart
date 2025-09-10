@@ -198,14 +198,14 @@ class _LoginPageState extends State<LoginPage> {
                         style: const TextStyle(
                           fontFamily: 'SFPro',
                           fontWeight: FontWeight.w500,
-                          fontSize: 14,
+                          fontSize: 16,
                           color: Colors.black,
                         ),
                       ),
                     ),
                     GestureDetector(
                       onTap: () {
-                        context.go(AppRoutes.createAccount);
+                        context.push(AppRoutes.createAccount);
                       },
                       child: Text(
                         _languageManager.getText(
@@ -215,7 +215,7 @@ class _LoginPageState extends State<LoginPage> {
                         style: const TextStyle(
                           fontFamily: 'SFPro',
                           fontWeight: FontWeight.w500,
-                          fontSize: 14,
+                          fontSize: 16,
                           color: Colors.black,
                         ),
                       ),

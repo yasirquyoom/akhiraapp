@@ -31,11 +31,22 @@ class AuthCubit extends Cubit<AuthState> {
       final response = await _authRepository.register(request);
 
       if (response.status == 201) {
+        // For registration, create user from the data fields
+        User? user;
+        if (response.data != null) {
+          user = User(
+            userId: response.data!.userId!,
+            name: response.data!.name!,
+            email: response.data!.email!,
+            createdAt: response.data!.createdAt!,
+          );
+        }
+
         emit(
           state.copyWith(
             status: AuthStatus.registerSuccess,
             message: response.message,
-            user: response.data?.user,
+            user: user,
           ),
         );
       } else {

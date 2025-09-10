@@ -110,7 +110,13 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                 Row(
                   children: [
                     IconButton(
-                      onPressed: () => context.pop(),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go(AppRoutes.login);
+                        }
+                      },
                       icon: const Icon(Icons.arrow_back, color: Colors.black),
                     ),
                     const SizedBox(width: 8),

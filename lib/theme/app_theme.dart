@@ -113,7 +113,10 @@ class AppTheme {
         backgroundColor: AppColors.primary,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontFamily: AppConstants.fontFamily,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -125,7 +128,10 @@ class AppTheme {
         side: BorderSide(color: AppColors.primary, width: 1),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontFamily: AppConstants.fontFamily,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -137,7 +143,10 @@ class AppTheme {
         foregroundColor: Colors.black,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(
+          fontFamily: AppConstants.fontFamily,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
