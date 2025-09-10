@@ -1,6 +1,9 @@
-import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:equatable/equatable.dart';
+import '../../repositories/quiz_repository.dart';
+import '../../models/quiz_response.dart';
 
+// Quiz Models
 class QuizQuestion extends Equatable {
   final String id;
   final String question;
@@ -55,6 +58,7 @@ class QuizAnswer extends Equatable {
   ];
 }
 
+// States
 abstract class QuizState extends Equatable {
   const QuizState();
 
@@ -63,6 +67,8 @@ abstract class QuizState extends Equatable {
 }
 
 class QuizInitial extends QuizState {}
+
+class QuizLoading extends QuizState {}
 
 class QuizLoaded extends QuizState {
   final List<QuizQuestion> questions;
@@ -128,151 +134,69 @@ class QuizCompleted extends QuizState {
   List<Object?> get props => [questions, answers, score, totalQuestions];
 }
 
-class QuizCubit extends Cubit<QuizState> {
-  QuizCubit() : super(QuizInitial());
+class QuizError extends QuizState {
+  final String message;
 
-  void loadQuizFromApi(List<dynamic> quizData) {
-    if (quizData.isEmpty) {
-      emit(QuizInitial());
-      return;
-    }
+  const QuizError({required this.message});
+
+  @override
+  List<Object?> get props => [message];
+}
+
+// Cubit
+class QuizCubit extends Cubit<QuizState> {
+  final QuizRepository _repository;
+
+  QuizCubit(this._repository) : super(QuizInitial());
+
+  Future<void> loadQuizzesFromApi({required String bookId}) async {
+    emit(QuizLoading());
 
     try {
-      final questions = <QuizQuestion>[];
+      final response = await _repository.getBookQuizzes(bookId: bookId);
 
-      for (final quiz in quizData) {
-        // Parse quiz data from the real API structure
-        final question = QuizQuestion(
-          id: quiz['quiz_id'] ?? 'unknown',
-          question: quiz['question'] ?? 'Quiz Question',
-          options: _parseQuizOptions(quiz),
-          correctAnswerId: quiz['correct_option'] ?? 'option1',
-        );
-        questions.add(question);
-      }
+      if (response.status == 200 && response.data != null) {
+        final questions = <QuizQuestion>[];
 
-      if (questions.isNotEmpty) {
-        emit(QuizLoaded(questions: questions));
+        for (final quiz in response.data!.quizzes) {
+          final question = QuizQuestion(
+            id: quiz.quizId,
+            question: quiz.question,
+            options: _parseQuizOptions(quiz),
+            correctAnswerId: quiz.correctOption,
+          );
+          questions.add(question);
+        }
+
+        if (questions.isNotEmpty) {
+          emit(QuizLoaded(questions: questions));
+        } else {
+          emit(QuizInitial());
+        }
       } else {
-        emit(QuizInitial());
+        emit(QuizError(message: response.message));
       }
     } catch (e) {
-      print('Error parsing quiz data: $e');
-      emit(QuizInitial());
+      emit(QuizError(message: e.toString()));
     }
   }
 
-  List<QuizOption> _parseQuizOptions(dynamic quiz) {
-    // Parse options from the real API structure
+  List<QuizOption> _parseQuizOptions(Quiz quiz) {
     final options = <QuizOption>[];
 
     // Add option1
-    if (quiz['option1'] != null) {
-      options.add(
-        QuizOption(id: 'option1', text: quiz['option1'], letter: 'A'),
-      );
-    }
+    options.add(QuizOption(id: 'option1', text: quiz.option1, letter: 'A'));
 
     // Add option2
-    if (quiz['option2'] != null) {
-      options.add(
-        QuizOption(id: 'option2', text: quiz['option2'], letter: 'B'),
-      );
-    }
+    options.add(QuizOption(id: 'option2', text: quiz.option2, letter: 'B'));
 
     // Add option3
-    if (quiz['option3'] != null) {
-      options.add(
-        QuizOption(id: 'option3', text: quiz['option3'], letter: 'C'),
-      );
-    }
+    options.add(QuizOption(id: 'option3', text: quiz.option3, letter: 'C'));
 
     // Add option4
-    if (quiz['option4'] != null) {
-      options.add(
-        QuizOption(id: 'option4', text: quiz['option4'], letter: 'D'),
-      );
-    }
+    options.add(QuizOption(id: 'option4', text: quiz.option4, letter: 'D'));
 
     return options;
-  }
-
-  void _loadQuiz() {
-    final questions = [
-      const QuizQuestion(
-        id: '1',
-        question: 'Qui est le dernier prophète envoyé par Dieu en islam ?',
-        options: [
-          QuizOption(
-            id: 'a',
-            text: 'Muhammad (paix et bénédictions sur lui)',
-            letter: 'A',
-          ),
-          QuizOption(
-            id: 'b',
-            text: "'Îsâ (que la paix soit sur lui)",
-            letter: 'B',
-          ),
-          QuizOption(
-            id: 'c',
-            text: 'Yûsuf (que la paix soit sur lui)',
-            letter: 'C',
-          ),
-          QuizOption(
-            id: 'd',
-            text: 'Mûsâ (que la paix soit sur lui)',
-            letter: 'D',
-          ),
-        ],
-        correctAnswerId: 'a',
-      ),
-      const QuizQuestion(
-        id: '2',
-        question: 'Quel est le premier livre révélé au Prophète Muhammad ?',
-        options: [
-          QuizOption(id: 'a', text: 'Al-Fatiha', letter: 'A'),
-          QuizOption(id: 'b', text: 'Al-Iqra', letter: 'B'),
-          QuizOption(id: 'c', text: 'Al-Baqarah', letter: 'C'),
-          QuizOption(id: 'd', text: 'An-Nas', letter: 'D'),
-        ],
-        correctAnswerId: 'b',
-      ),
-      const QuizQuestion(
-        id: '3',
-        question: 'Combien de sourates contient le Coran ?',
-        options: [
-          QuizOption(id: 'a', text: '114', letter: 'A'),
-          QuizOption(id: 'b', text: '113', letter: 'B'),
-          QuizOption(id: 'c', text: '115', letter: 'C'),
-          QuizOption(id: 'd', text: '112', letter: 'D'),
-        ],
-        correctAnswerId: 'a',
-      ),
-      const QuizQuestion(
-        id: '4',
-        question: 'Quel est le nom de la première femme du Prophète Muhammad ?',
-        options: [
-          QuizOption(id: 'a', text: 'Aïcha', letter: 'A'),
-          QuizOption(id: 'b', text: 'Khadija', letter: 'B'),
-          QuizOption(id: 'c', text: 'Fatima', letter: 'C'),
-          QuizOption(id: 'd', text: 'Zaynab', letter: 'D'),
-        ],
-        correctAnswerId: 'b',
-      ),
-      const QuizQuestion(
-        id: '5',
-        question: 'Dans quelle ville le Prophète Muhammad est-il né ?',
-        options: [
-          QuizOption(id: 'a', text: 'Médine', letter: 'A'),
-          QuizOption(id: 'b', text: 'La Mecque', letter: 'B'),
-          QuizOption(id: 'c', text: 'Damas', letter: 'C'),
-          QuizOption(id: 'd', text: 'Bagdad', letter: 'D'),
-        ],
-        correctAnswerId: 'b',
-      ),
-    ];
-
-    emit(QuizLoaded(questions: questions));
   }
 
   void selectOption(String optionId) {
@@ -372,6 +296,5 @@ class QuizCubit extends Cubit<QuizState> {
 
   void restartQuiz() {
     emit(QuizInitial());
-    _loadQuiz();
   }
 }

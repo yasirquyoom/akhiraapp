@@ -40,6 +40,7 @@ class CustomButton extends StatelessWidget {
               style: TextStyle(
                 color: textColor ?? Theme.of(context).colorScheme.onPrimary,
                 fontWeight: FontWeight.w600,
+                fontSize: 16,
               ),
             );
 

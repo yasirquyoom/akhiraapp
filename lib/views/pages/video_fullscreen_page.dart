@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -235,7 +236,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
-                                  Icons.arrow_back,
+                                  CupertinoIcons.back,
                                   color: Colors.white,
                                   size: 24.sp,
                                 ),

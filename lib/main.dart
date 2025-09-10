@@ -13,7 +13,7 @@ import 'data/cubits/book_content/book_content_state.dart';
 import 'data/cubits/home/home_cubit.dart';
 import 'data/cubits/images/images_cubit.dart';
 import 'data/cubits/pdf/pdf_cubit.dart';
-import 'data/cubits/quiz/quiz_cubit.dart';
+import 'data/cubits/quiz/quiz_cubit_new.dart';
 import 'data/cubits/videos/videos_cubit.dart';
 import 'router/app_router.dart';
 import 'theme/app_theme.dart';

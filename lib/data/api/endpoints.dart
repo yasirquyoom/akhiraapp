@@ -16,4 +16,8 @@ class Endpoints {
   // Book Content
   static String bookContent(String bookId) =>
       '/user/collections/book/$bookId/content';
+
+  // Quiz
+  static String bookQuizzes(String bookId) =>
+      '/user/collections/book/$bookId/quizzes';
 }

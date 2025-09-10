@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -160,7 +161,7 @@ class _AccountPageState extends State<AccountPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0C1138)),
+          icon: Icon(CupertinoIcons.back, color: Color(0xFF0C1138)),
           onPressed: () => context.pop(),
         ),
         title: Text(

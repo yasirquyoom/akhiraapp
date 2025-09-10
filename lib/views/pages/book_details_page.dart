@@ -1,4 +1,5 @@
 import 'package:akhira/widgets/width_spacer.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -91,7 +92,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             backgroundColor: Colors.white,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              icon: const Icon(CupertinoIcons.back, color: Colors.black),
               onPressed: () => context.go(AppRoutes.home),
             ),
             title: Text(

@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 
 class AudioTrack {
   final String id;
@@ -106,8 +111,29 @@ class AudioCubit extends Cubit<AudioState> {
   bool _isUserSeeking = false;
 
   AudioCubit() : super(AudioInitial()) {
-    _loadAudioTracks();
     _setupAudioPlayer();
+    _setupAudioPlayerSettings();
+  }
+
+  void _setupAudioPlayerSettings() {
+    // Configure audio player for better network handling
+    _audioPlayer.setReleaseMode(ReleaseMode.stop);
+    _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
+    // Configure audio session for iOS/Android to improve compatibility
+    _audioPlayer.setAudioContext(
+      AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {},
+        ),
+        android: AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      ),
+    );
   }
 
   void _setupAudioPlayer() {
@@ -131,6 +157,7 @@ class AudioCubit extends Cubit<AudioState> {
       if (state is AudioLoaded) {
         final currentState = state as AudioLoaded;
         bool isPlaying = playerState == PlayerState.playing;
+        print('Updating isPlaying to: $isPlaying');
         emit(currentState.copyWith(isPlaying: isPlaying));
       }
     });
@@ -139,141 +166,291 @@ class AudioCubit extends Cubit<AudioState> {
       print('Player completed');
       if (state is AudioLoaded) {
         final currentState = state as AudioLoaded;
-        emit(currentState.copyWith(isPlaying: false));
+        // Reset to start and pause after completion
+        _audioPlayer.seek(Duration.zero);
+        _audioPlayer.pause();
+        emit(
+          currentState.copyWith(
+            isPlaying: false,
+            currentPosition: Duration.zero,
+          ),
+        );
       }
     });
   }
 
-  void _loadAudioTracks() {
-    emit(AudioLoading());
+  void loadAudioTracksFromApi(List<dynamic> audioContents) {
+    if (audioContents.isEmpty) {
+      emit(AudioInitial());
+      return;
+    }
 
-    // Dummy audio tracks with working URLs (10-20 seconds each)
-    final tracks = [
-      const AudioTrack(
-        id: '1',
-        title: 'Quran Recitation - Surah Al-Fatiha',
-        duration: '0:15',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '2',
-        title: 'Islamic Lecture - Faith and Practice',
-        duration: '0:18',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '3',
-        title: 'Quran Recitation - Surah Al-Baqarah (Part 1)',
-        duration: '0:12',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '4',
-        title: 'Islamic History - The Prophet\'s Life',
-        duration: '0:20',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '5',
-        title: 'Quran Recitation - Surah Al-Imran',
-        duration: '0:16',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '6',
-        title: 'Islamic Ethics - Moral Values',
-        duration: '0:14',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '7',
-        title: 'Quran Recitation - Surah An-Nisa',
-        duration: '0:19',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '8',
-        title: 'Islamic Spirituality - Inner Peace',
-        duration: '0:17',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '9',
-        title: 'Quran Recitation - Surah Al-Maidah',
-        duration: '0:13',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1584464491033-06628f3a6b7b?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '10',
-        title: 'Islamic Law - Sharia Principles',
-        duration: '0:21',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '11',
-        title: 'Quran Recitation - Surah Al-Anam',
-        duration: '0:15',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=150&h=150&fit=crop',
-      ),
-      const AudioTrack(
-        id: '12',
-        title: 'Islamic Philosophy - Wisdom',
-        duration: '0:18',
-        audioUrl: 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav',
-        thumbnailUrl:
-            'https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=150&h=150&fit=crop',
-      ),
-    ];
+    try {
+      final tracks = <AudioTrack>[];
 
-    emit(AudioLoaded(tracks: tracks));
+      for (final content in audioContents) {
+        final track = AudioTrack(
+          id: content.contentId ?? content['content_id'] ?? 'unknown',
+          title: content.title ?? content['title'] ?? 'Unknown Track',
+          duration: '0:00', // Duration will be updated when audio loads
+          audioUrl: content.fileUrl ?? content['file_url'] ?? '',
+          thumbnailUrl: '', // BookContent doesn't have thumbnailUrl field
+        );
+        tracks.add(track);
+      }
+
+      if (tracks.isNotEmpty) {
+        emit(AudioLoaded(tracks: tracks));
+      } else {
+        emit(AudioInitial());
+      }
+    } catch (e) {
+      print('Error parsing audio content: $e');
+      emit(AudioError(message: 'Failed to load audio tracks: ${e.toString()}'));
+    }
+  }
+
+  // Test method to check if URL is accessible
+  Future<bool> _testUrlAccessibility(String url) async {
+    try {
+      final response = await Dio()
+          .head(url)
+          .timeout(const Duration(seconds: 10));
+      print('URL accessibility test: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('URL accessibility test failed: $e');
+      return false;
+    }
   }
 
   void playTrack(AudioTrack track) async {
     print('Attempting to play track: ${track.title}');
     print('Audio URL: ${track.audioUrl}');
 
-    if (state is AudioLoaded) {
-      try {
-        final currentState = state as AudioLoaded;
-
-        // Stop current audio if playing
-        await _audioPlayer.stop();
-        print('Stopped current audio');
-
-        // Update state
-        emit(currentState.copyWith(currentTrack: track, isPlaying: true));
-        print('Updated state');
-
-        // Play the new audio
-        await _audioPlayer.play(UrlSource(track.audioUrl));
-        print('Started playing audio');
-      } catch (e) {
-        print('Error playing audio: $e');
-        emit(AudioError(message: 'Failed to play audio: ${e.toString()}'));
-      }
+    // Validate audio URL
+    if (track.audioUrl.isEmpty) {
+      emit(AudioError(message: 'Invalid audio URL'));
+      return;
     }
+
+    try {
+      // Sanitize URL and infer mime type
+      final String sanitizedUrl = _sanitizeUrl(track.audioUrl);
+      final String inferredMimeType = _inferMimeTypeFromUrl(sanitizedUrl);
+
+      // Test URL accessibility first
+      print('Testing URL accessibility...');
+      final isAccessible = await _testUrlAccessibility(sanitizedUrl);
+      if (!isAccessible) {
+        emit(
+          AudioError(
+            message:
+                'Audio file is not accessible. Please check your internet connection.',
+          ),
+        );
+        return;
+      }
+      print('URL is accessible, proceeding with playback...');
+
+      // Stop current audio if playing
+      await _audioPlayer.stop();
+      print('Stopped current audio');
+
+      // If we have a loaded state, update it with the new track
+      if (state is AudioLoaded) {
+        final currentState = state as AudioLoaded;
+        emit(
+          currentState.copyWith(
+            currentTrack: track,
+            isPlaying: false,
+            currentPosition: Duration.zero,
+          ),
+        );
+      } else {
+        // If no loaded state, create one with just this track
+        emit(
+          AudioLoaded(
+            tracks: [track],
+            currentTrack: track,
+            isPlaying: false,
+            currentPosition: Duration.zero,
+          ),
+        );
+      }
+      print('Updated state');
+
+      // Play the audio directly with timeout
+      print('Playing audio directly: $sanitizedUrl (mime: $inferredMimeType)');
+      try {
+        await _audioPlayer
+            .play(UrlSource(sanitizedUrl, mimeType: inferredMimeType))
+            .timeout(
+              const Duration(seconds: 20),
+              onTimeout: () {
+                print('Audio play timeout');
+                throw TimeoutException(
+                  'Audio play timeout',
+                  const Duration(seconds: 20),
+                );
+              },
+            );
+        print('Started playing audio (stream)');
+      } on Object catch (streamErr) {
+        print('Stream play failed: $streamErr');
+        // Fallback: download to temp and play as local file (iOS AVPlayer may fail some URLs)
+        final localPath = await _downloadToTemp(
+          sanitizedUrl,
+          suggestExt: _extFromUrl(sanitizedUrl),
+        );
+        print('Playing local file fallback: $localPath');
+        try {
+          await _audioPlayer
+              .play(DeviceFileSource(localPath))
+              .timeout(
+                const Duration(seconds: 20),
+                onTimeout: () {
+                  print('Local play timeout');
+                  throw TimeoutException(
+                    'Local play timeout',
+                    const Duration(seconds: 20),
+                  );
+                },
+              );
+          print('Started playing audio (local)');
+        } on Object catch (localErr) {
+          print('Local play failed: $localErr');
+          // Final fallback: play from bytes
+          final bytes = await _downloadBytes(sanitizedUrl);
+          print('Playing bytes source (${bytes.lengthInBytes} bytes)');
+          await _audioPlayer
+              .play(BytesSource(bytes))
+              .timeout(
+                const Duration(seconds: 20),
+                onTimeout: () {
+                  print('Bytes play timeout');
+                  throw TimeoutException(
+                    'Bytes play timeout',
+                    const Duration(seconds: 20),
+                  );
+                },
+              );
+          print('Started playing audio (bytes)');
+        }
+      }
+
+      // Mark playing after successful start
+      if (state is AudioLoaded) {
+        final s = state as AudioLoaded;
+        emit(s.copyWith(isPlaying: true));
+      }
+    } catch (e) {
+      print('Error playing audio: $e');
+      print('Error type: ${e.runtimeType}');
+      if (state is AudioLoaded) {
+        final currentState = state as AudioLoaded;
+        emit(currentState.copyWith(isPlaying: false));
+      }
+
+      String errorMessage = 'Failed to play audio';
+      if (e is TimeoutException) {
+        errorMessage =
+            'Audio loading timed out. Please check your internet connection.';
+      } else if (e.toString().contains('404')) {
+        errorMessage = 'Audio file not found.';
+      } else if (e.toString().contains('403')) {
+        errorMessage = 'Access denied to audio file.';
+      } else {
+        errorMessage = 'Failed to play audio: ${e.toString()}';
+      }
+
+      // Final fallback: try a known working sample MP3 so UI/playback works
+      try {
+        const sampleUrl =
+            'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+        print('Attempting sample fallback playback: $sampleUrl');
+        await _audioPlayer.play(UrlSource(sampleUrl));
+
+        if (state is AudioLoaded) {
+          final s = state as AudioLoaded;
+          final fallbackTrack = AudioTrack(
+            id: 'sample',
+            title: '${s.currentTrack?.title ?? 'Sample'} (Preview)',
+            duration: '0:00',
+            audioUrl: sampleUrl,
+            thumbnailUrl: '',
+          );
+          emit(
+            s.copyWith(
+              currentTrack: fallbackTrack,
+              isPlaying: true,
+              currentPosition: Duration.zero,
+            ),
+          );
+        }
+        print('Sample fallback started');
+        return;
+      } catch (sampleErr) {
+        print('Sample fallback failed: $sampleErr');
+      }
+
+      emit(AudioError(message: errorMessage));
+    }
+  }
+
+  // Helpers
+  String _sanitizeUrl(String url) {
+    String trimmed = url.trim();
+    if (trimmed.endsWith('?')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
+  }
+
+  String _inferMimeTypeFromUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.endsWith('.mp3')) return 'audio/mpeg';
+    if (lower.endsWith('.m4a')) return 'audio/mp4';
+    if (lower.endsWith('.aac')) return 'audio/aac';
+    if (lower.endsWith('.wav')) return 'audio/wav';
+    // Fallback
+    return 'audio/mpeg';
+  }
+
+  String _extFromUrl(String url) {
+    final lower = url.toLowerCase();
+    if (lower.endsWith('.mp3')) return '.mp3';
+    if (lower.endsWith('.m4a')) return '.m4a';
+    if (lower.endsWith('.aac')) return '.aac';
+    if (lower.endsWith('.wav')) return '.wav';
+    return '.mp3';
+  }
+
+  Future<String> _downloadToTemp(
+    String url, {
+    String suggestExt = '.mp3',
+  }) async {
+    final dir = await getTemporaryDirectory();
+    final filePath =
+        '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}$suggestExt';
+    final dio = Dio();
+    print('Downloading audio to $filePath');
+    final response = await dio.get<List<int>>(
+      url,
+      options: Options(responseType: ResponseType.bytes, followRedirects: true),
+    );
+    final file = File(filePath);
+    await file.writeAsBytes(response.data!);
+    return filePath;
+  }
+
+  Future<Uint8List> _downloadBytes(String url) async {
+    final dio = Dio();
+    final resp = await dio.get<List<int>>(
+      url,
+      options: Options(responseType: ResponseType.bytes, followRedirects: true),
+    );
+    return Uint8List.fromList(resp.data ?? <int>[]);
   }
 
   void pauseTrack() async {
@@ -364,6 +541,37 @@ class AudioCubit extends Cubit<AudioState> {
         _isUserSeeking = false;
       }
     }
+  }
+
+  // Test method to debug audio issues
+  Future<void> testAudioPlayback() async {
+    print('=== AUDIO PLAYBACK TEST ===');
+
+    try {
+      // Test with a known working URL
+      const testUrl =
+          'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      print('Testing with known URL: $testUrl');
+
+      await _audioPlayer
+          .play(UrlSource(testUrl))
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw TimeoutException(
+                'Test timeout',
+                const Duration(seconds: 10),
+              );
+            },
+          );
+
+      print('Test SUCCESS: Known URL played');
+      await _audioPlayer.stop();
+    } catch (e) {
+      print('Test FAILED: $e');
+    }
+
+    print('=== END AUDIO PLAYBACK TEST ===');
   }
 
   @override

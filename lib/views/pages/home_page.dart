@@ -1,3 +1,4 @@
+import 'package:akhira/widgets/language_toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -15,7 +16,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_feedback.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/height_spacer.dart';
-import '../../widgets/language_toggle.dart';
+import '../../widgets/shimmer_book_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -127,18 +128,9 @@ class _HomePageState extends State<HomePage> {
                             // Profile icon - navigate to account page
                             GestureDetector(
                               onTap: () => context.push(AppRoutes.account),
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade300,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.person,
-                                  size: 20,
-                                  color: Colors.grey,
-                                ),
+                              child: Image.asset(
+                                AppAssets.profileImage,
+                                scale: 4,
                               ),
                             ),
                           ],
@@ -148,9 +140,7 @@ class _HomePageState extends State<HomePage> {
                         Expanded(
                           child:
                               state is HomeLoading
-                                  ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
+                                  ? _buildLoadingState()
                                   : state is HomeEmpty
                                   ? _buildEmptyState()
                                   : state is HomeLoaded
@@ -168,6 +158,49 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Column(
+      children: [
+        // Library header with + button
+        Row(
+          children: [
+            Text(
+              _languageManager.getText('My Library', 'Ma Bibliothèque'),
+              style: const TextStyle(
+                fontFamily: 'SFPro',
+                fontWeight: FontWeight.w700,
+                fontSize: 24,
+                fontStyle: FontStyle.italic,
+                color: Color(0xff0C1138),
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: _showAddBookDialog,
+              child: const Icon(Icons.add, color: Color(0xff0C1138), size: 30),
+            ),
+          ],
+        ),
+        const HeightSpacer(20),
+        // Shimmer books grid
+        Expanded(
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.7,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: 6, // Show 6 shimmer cards
+            itemBuilder: (context, index) {
+              return const ShimmerBookCard();
+            },
+          ),
+        ),
+      ],
     );
   }
 

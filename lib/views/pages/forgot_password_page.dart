@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -99,9 +100,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                 // Header with back button and title
                 Row(
                   children: [
-                    IconButton(
-                      onPressed: () => context.go(AppRoutes.login),
-                      icon: const Icon(Icons.arrow_back, color: Colors.black),
+                    InkWell(
+                      onTap: () => context.go(AppRoutes.login),
+                      child: Icon(CupertinoIcons.back, color: Colors.black),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -112,7 +113,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       style: const TextStyle(
                         fontFamily: 'SFPro',
                         fontWeight: FontWeight.w700,
-                        fontSize: 20,
+                        fontSize: 24,
                         color: Colors.black,
                       ),
                     ),

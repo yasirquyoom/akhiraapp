@@ -10,6 +10,7 @@ class AppAssets {
   static const String appTextLogo = 'assets/images/app_text_logo.png';
   static const String bookImage = 'assets/images/book_image.png';
   static const String homeTextImage = 'assets/images/home_text.png';
+  static const String profileImage = 'assets/images/account_icon.png';
 
   // Book Details Icons
   static const String iconEbook = 'assets/images/ebook.png';

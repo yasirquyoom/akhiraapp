@@ -1,5 +1,6 @@
 import 'package:akhira/data/repositories/collection_repository.dart';
 import 'package:akhira/data/repositories/book_content_repository.dart';
+import 'package:akhira/data/repositories/quiz_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:get_it/get_it.dart';
 
@@ -10,7 +11,7 @@ import '../../data/cubits/book_content/book_content_state.dart';
 import '../../data/cubits/home/home_cubit.dart';
 import '../../data/cubits/images/images_cubit.dart';
 import '../../data/cubits/pdf/pdf_cubit.dart';
-import '../../data/cubits/quiz/quiz_cubit.dart';
+import '../../data/cubits/quiz/quiz_cubit_new.dart';
 import '../../data/cubits/videos/videos_cubit.dart';
 import '../../data/helper/dio_client.dart';
 import '../../data/repositories/auth_repository.dart';
@@ -41,6 +42,9 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<BookContentRepository>(
     () => BookContentRepository(getIt<DioClient>()),
   );
+  getIt.registerLazySingleton<QuizRepository>(
+    () => QuizRepository(getIt<DioClient>()),
+  );
 
   // Services
   getIt.registerLazySingleton<ImageDownloadService>(
@@ -59,6 +63,6 @@ Future<void> setupServiceLocator() async {
   getIt.registerLazySingleton<AudioCubit>(() => AudioCubit());
   getIt.registerLazySingleton<ImagesCubit>(() => ImagesCubit());
   getIt.registerLazySingleton<PdfCubit>(() => PdfCubit());
-  getIt.registerFactory<QuizCubit>(() => QuizCubit());
+  getIt.registerFactory<QuizCubit>(() => QuizCubit(getIt<QuizRepository>()));
   getIt.registerLazySingleton<VideosCubit>(() => VideosCubit());
 }

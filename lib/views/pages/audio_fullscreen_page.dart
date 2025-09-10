@@ -59,12 +59,26 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
   Widget build(BuildContext context) {
     return BlocBuilder<AudioCubit, AudioState>(
       builder: (context, state) {
-        if (state is! AudioLoaded || state.currentTrack == null) {
+        if (state is! AudioLoaded) {
+          return Scaffold(
+            backgroundColor: AppColors.primaryGradientEnd,
+            body: const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
+
+        // If no current track, use the first available track
+        final currentTrack =
+            state.currentTrack ??
+            (state.tracks.isNotEmpty ? state.tracks.first : null);
+
+        if (currentTrack == null) {
           return Scaffold(
             backgroundColor: AppColors.primaryGradientEnd,
             body: const Center(
               child: Text(
-                'No audio playing',
+                'No audio tracks available',
                 style: TextStyle(color: Colors.white),
               ),
             ),
@@ -206,7 +220,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
 
                   // Track Title
                   Text(
-                    state.currentTrack!.title,
+                    state.currentTrack?.title ?? 'Unknown Artist',
                     style: TextStyle(
                       fontFamily: 'SFPro',
                       fontWeight: FontWeight.w700,
@@ -359,8 +373,13 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
           onTap: () {
             if (state.isPlaying) {
               context.read<AudioCubit>().pauseTrack();
-            } else {
+            } else if (state.currentTrack != null) {
               context.read<AudioCubit>().resumeTrack();
+            } else {
+              // If no track is playing, start playing the first available track
+              if (state.tracks.isNotEmpty) {
+                context.read<AudioCubit>().playTrack(state.tracks.first);
+              }
             }
           },
           child: Container(

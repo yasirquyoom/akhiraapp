@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -117,7 +118,10 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                           context.go(AppRoutes.login);
                         }
                       },
-                      icon: const Icon(Icons.arrow_back, color: Colors.black),
+                      icon: const Icon(
+                        CupertinoIcons.back,
+                        color: Colors.black,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -128,7 +132,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                       style: const TextStyle(
                         fontFamily: 'SFPro',
                         fontWeight: FontWeight.w700,
-                        fontSize: 20,
+                        fontSize: 24,
                         color: Colors.black,
                       ),
                     ),
@@ -214,7 +218,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                         style: const TextStyle(
                           fontFamily: 'SFPro',
                           fontWeight: FontWeight.w500,
-                          fontSize: 14,
+                          fontSize: 16,
                           color: Colors.black,
                         ),
                       ),
@@ -231,7 +235,7 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                         style: const TextStyle(
                           fontFamily: 'SFPro',
                           fontWeight: FontWeight.w500,
-                          fontSize: 14,
+                          fontSize: 16,
                           color: Colors.black,
                         ),
                       ),

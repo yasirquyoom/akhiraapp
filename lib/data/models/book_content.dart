@@ -39,7 +39,7 @@ class BookContent extends Equatable {
       mimeType: json['mime_type'] as String,
       contentNumber: json['content_number'] as int,
       createdAt: json['created_at'] as String,
-      updatedAt: json['updated_at'] as String,
+      updatedAt: json['updated_at'] as String? ?? '',
     );
   }
 

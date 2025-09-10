@@ -37,37 +37,34 @@ class BookContentError extends BookContentState {
 class BookContentCubit extends Cubit<BookContentState> {
   final BookContentRepository _repository;
   final Map<String, BookContentData> _cachedContent = {};
+  BookContentData? _allContentData;
+  String? _currentBookId;
 
   BookContentCubit(this._repository) : super(BookContentInitial());
 
-  Future<void> loadBookContent({
-    required String bookId,
-    String? contentType,
-  }) async {
+  Future<void> loadAllBookContent({required String bookId}) async {
     if (isClosed) return;
 
-    // Create cache key
-    final cacheKey = '${bookId}_${contentType ?? 'all'}';
-
-    // Check if we already have this content cached
-    if (_cachedContent.containsKey(cacheKey)) {
-      emit(BookContentLoaded(data: _cachedContent[cacheKey]!));
+    // If we already have all content for this book, don't reload
+    if (_allContentData != null && _currentBookId == bookId) {
+      emit(BookContentLoaded(data: _allContentData!));
       return;
     }
 
     emit(BookContentLoading());
 
     try {
+      // Load all content without content_type filter
       final response = await _repository.getBookContent(
         bookId: bookId,
-        contentType: contentType,
+        contentType: null, // No filter - get all content
       );
 
       if (isClosed) return;
 
       if (response.status == 200 && response.data != null) {
-        // Cache the content
-        _cachedContent[cacheKey] = response.data!;
+        _allContentData = response.data!;
+        _currentBookId = bookId;
         emit(BookContentLoaded(data: response.data!));
       } else {
         emit(BookContentError(message: response.message));
@@ -82,11 +79,90 @@ class BookContentCubit extends Cubit<BookContentState> {
     required String bookId,
     required String contentType,
   }) async {
-    await loadBookContent(bookId: bookId, contentType: contentType);
+    if (isClosed) return;
+
+    // If we have all content cached, filter it immediately without loading state
+    if (_allContentData != null && _currentBookId == bookId) {
+      final filteredData = _filterContentByType(_allContentData!, contentType);
+      emit(BookContentLoaded(data: filteredData));
+      return;
+    }
+
+    // If we don't have all content, load it first
+    await loadAllBookContent(bookId: bookId);
+  }
+
+  Future<void> refreshContentByType({
+    required String bookId,
+    required String contentType,
+  }) async {
+    if (isClosed) return;
+
+    emit(BookContentLoading());
+
+    try {
+      // Load specific content type for refresh
+      final response = await _repository.getBookContent(
+        bookId: bookId,
+        contentType: contentType,
+      );
+
+      if (isClosed) return;
+
+      if (response.status == 200 && response.data != null) {
+        // Update the cached all content with the refreshed data
+        if (_allContentData != null && _currentBookId == bookId) {
+          _updateContentInCache(_allContentData!, response.data!, contentType);
+        }
+
+        emit(BookContentLoaded(data: response.data!));
+      } else {
+        emit(BookContentError(message: response.message));
+      }
+    } catch (e) {
+      if (isClosed) return;
+      emit(BookContentError(message: e.toString()));
+    }
+  }
+
+  BookContentData _filterContentByType(
+    BookContentData allData,
+    String contentType,
+  ) {
+    final filteredContents =
+        allData.contents
+            ?.where((content) => content.contentType == contentType)
+            .toList();
+
+    return BookContentData(
+      bookDetails: allData.bookDetails,
+      contentType: contentType,
+      contents: filteredContents,
+      total: filteredContents?.length ?? 0,
+      skip: allData.skip,
+      limit: allData.limit,
+    );
+  }
+
+  void _updateContentInCache(
+    BookContentData allData,
+    BookContentData refreshedData,
+    String contentType,
+  ) {
+    if (allData.contents != null && refreshedData.contents != null) {
+      // Remove old content of this type
+      allData.contents!.removeWhere(
+        (content) => content.contentType == contentType,
+      );
+      // Add refreshed content
+      allData.contents!.addAll(refreshedData.contents!);
+    }
   }
 
   // Method to clear cache if needed
   void clearCache() {
     _cachedContent.clear();
+    _allContentData = null;
+    _currentBookId = null;
   }
 }

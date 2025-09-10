@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
                       style: const TextStyle(
                         fontFamily: 'SFPro',
                         fontWeight: FontWeight.w700,
-                        fontSize: 20,
+                        fontSize: 24,
                         color: Colors.black,
                       ),
                     ),

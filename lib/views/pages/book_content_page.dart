@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'package:akhira/data/cubits/quiz/quiz_cubit_new.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -10,7 +12,6 @@ import '../../core/language/language_manager.dart';
 import '../../data/cubits/audio/audio_cubit.dart';
 import '../../data/cubits/book/book_state.dart';
 import '../../data/cubits/book_content/book_content_state.dart';
-import '../../data/cubits/quiz/quiz_cubit.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
 
@@ -43,8 +44,8 @@ class _BookContentPageState extends State<BookContentPage>
     );
     _tabController.addListener(_onTabChanged);
 
-    // Load book content - will use global state or widget parameter
-    _loadContentForCurrentTab();
+    // Load all book content initially
+    _loadAllBookContent();
   }
 
   @override
@@ -60,15 +61,21 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   void _onTabChanged() {
+    final previousTabIndex = _currentTabIndex;
     setState(() {
       _currentTabIndex = _tabController.index;
     });
 
-    // Load content for the new tab
-    _loadContentForCurrentTab();
+    // Pause audio if switching away from audio tab
+    if (previousTabIndex == 1 && _currentTabIndex != 1) {
+      context.read<AudioCubit>().pauseTrack();
+    }
+
+    // Filter content based on current tab
+    _filterContentForCurrentTab();
   }
 
-  void _loadContentForCurrentTab() {
+  void _loadAllBookContent() {
     // Get book ID from global state first, fallback to widget parameter
     final bookCubit = context.read<BookCubit>();
     String? bookId = bookCubit.getCurrentBookId();
@@ -82,6 +89,25 @@ class _BookContentPageState extends State<BookContentPage>
 
     if (bookId == null || bookId.isEmpty) {
       print('Warning: Book ID is null or empty, cannot load content');
+      return;
+    }
+
+    print('Loading all content for bookId: $bookId');
+    context.read<BookContentCubit>().loadAllBookContent(bookId: bookId);
+  }
+
+  void _filterContentForCurrentTab() {
+    // Get book ID from global state first, fallback to widget parameter
+    final bookCubit = context.read<BookCubit>();
+    String? bookId = bookCubit.getCurrentBookId();
+
+    // If no book ID in global state, try widget parameter
+    if (bookId == null && widget.bookId != null && widget.bookId!.isNotEmpty) {
+      bookId = widget.bookId;
+    }
+
+    if (bookId == null || bookId.isEmpty) {
+      print('Warning: Book ID is null or empty, cannot filter content');
       return;
     }
 
@@ -104,8 +130,49 @@ class _BookContentPageState extends State<BookContentPage>
         break;
     }
 
-    print('Loading content for bookId: $bookId, contentType: $contentType');
+    print('Filtering content for bookId: $bookId, contentType: $contentType');
     context.read<BookContentCubit>().loadContentByType(
+      bookId: bookId,
+      contentType: contentType ?? '',
+    );
+  }
+
+  void _refreshCurrentTabContent() {
+    // Get book ID from global state first, fallback to widget parameter
+    final bookCubit = context.read<BookCubit>();
+    String? bookId = bookCubit.getCurrentBookId();
+
+    // If no book ID in global state, try widget parameter
+    if (bookId == null && widget.bookId != null && widget.bookId!.isNotEmpty) {
+      bookId = widget.bookId;
+    }
+
+    if (bookId == null || bookId.isEmpty) {
+      print('Warning: Book ID is null or empty, cannot refresh content');
+      return;
+    }
+
+    String? contentType;
+    switch (_currentTabIndex) {
+      case 0: // Digital book
+        contentType = 'ebook';
+        break;
+      case 1: // Audio book
+        contentType = 'audio';
+        break;
+      case 2: // Quiz
+        contentType = 'quiz';
+        break;
+      case 3: // Videos
+        contentType = 'video';
+        break;
+      case 4: // Images
+        contentType = 'image';
+        break;
+    }
+
+    print('Refreshing content for bookId: $bookId, contentType: $contentType');
+    context.read<BookContentCubit>().refreshContentByType(
       bookId: bookId,
       contentType: contentType ?? '',
     );
@@ -119,9 +186,8 @@ class _BookContentPageState extends State<BookContentPage>
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(CupertinoIcons.back, color: Colors.black),
           onPressed: () {
-            // Navigate back to the book details page
             context.go(AppRoutes.bookDetails);
           },
         ),
@@ -234,24 +300,32 @@ class _BookContentPageState extends State<BookContentPage>
           ),
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildDigitalBookTab(),
-          _buildAudioTab(),
-          _buildQuizTab(),
-          _buildVideosTab(),
-          _buildImagesTab(),
-        ],
-      ),
-      bottomNavigationBar: BlocBuilder<AudioCubit, AudioState>(
-        builder: (context, state) {
-          if (state is AudioLoaded && state.currentTrack != null) {
-            return _buildBottomPlayer(state);
-          }
-          return const SizedBox.shrink();
+      body: RefreshIndicator(
+        onRefresh: () async {
+          _refreshCurrentTabContent();
         },
+        child: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildDigitalBookTab(),
+            _buildAudioTab(),
+            _buildQuizTab(),
+            _buildVideosTab(),
+            _buildImagesTab(),
+          ],
+        ),
       ),
+      bottomNavigationBar:
+          _currentTabIndex == 1
+              ? BlocBuilder<AudioCubit, AudioState>(
+                builder: (context, state) {
+                  if (state is AudioLoaded && state.currentTrack != null) {
+                    return _buildBottomPlayer(state);
+                  }
+                  return const SizedBox.shrink();
+                },
+              )
+              : null,
     );
   }
 
@@ -346,7 +420,7 @@ class _BookContentPageState extends State<BookContentPage>
                 ),
                 SizedBox(height: 16.h),
                 ElevatedButton(
-                  onPressed: () => _loadContentForCurrentTab(),
+                  onPressed: () => _refreshCurrentTabContent(),
                   child: Text('Retry'),
                 ),
               ],
@@ -631,6 +705,9 @@ class _BookContentPageState extends State<BookContentPage>
             );
           }
 
+          // Load audio data into AudioCubit
+          context.read<AudioCubit>().loadAudioTracksFromApi(audioContents);
+
           return _buildAudioList(audioContents);
         } else if (state is BookContentError) {
           return Center(child: Text('Error: ${state.message}'));
@@ -847,14 +924,80 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildQuizTab() {
+    // Check if bookId is available in global state
+    final bookCubit = context.read<BookCubit>();
+    final bookId = bookCubit.getCurrentBookId();
+
+    if (bookId == null || bookId.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+            SizedBox(height: 16.h),
+            Text(
+              'No Book Selected',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.red[700],
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Please go back and select a book first',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton(
+              onPressed: () => context.go(AppRoutes.home),
+              child: Text('Go to Home'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return BlocBuilder<QuizCubit, QuizState>(
       builder: (context, state) {
-        if (state is QuizLoaded) {
+        if (state is QuizLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is QuizLoaded) {
           return _buildQuizContent(state);
         } else if (state is QuizCompleted) {
           return _buildQuizCompleted(state);
+        } else if (state is QuizError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64.sp, color: Colors.red),
+                SizedBox(height: 16.h),
+                Text(
+                  'Error: ${state.message}',
+                  style: TextStyle(fontSize: 16.sp, color: Colors.red[700]),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16.h),
+                ElevatedButton(
+                  onPressed: () {
+                    context.read<QuizCubit>().loadQuizzesFromApi(
+                      bookId: bookId,
+                    );
+                  },
+                  child: Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // QuizInitial state - load quizzes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+          });
+          return const Center(child: CircularProgressIndicator());
         }
-        return const Center(child: CircularProgressIndicator());
       },
     );
   }
@@ -1235,8 +1378,6 @@ class _BookContentPageState extends State<BookContentPage>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.videocam, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
                   Text(
                     'No videos available',
                     style: TextStyle(
@@ -1274,7 +1415,7 @@ class _BookContentPageState extends State<BookContentPage>
                 ),
                 SizedBox(height: 16.h),
                 ElevatedButton(
-                  onPressed: () => _loadContentForCurrentTab(),
+                  onPressed: () => _refreshCurrentTabContent(),
                   child: Text('Retry'),
                 ),
               ],
