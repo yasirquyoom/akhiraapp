@@ -1,3 +1,4 @@
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'dart:math' as math;
 import 'package:akhira/data/cubits/quiz/quiz_cubit_new.dart';
 import 'package:flutter/cupertino.dart';
@@ -377,26 +378,15 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (ebookContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.picture_as_pdf, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No PDF available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return const SizedBox.shrink();
           }
 
-          return _buildEbookList(ebookContents);
+          // Render PDF inline in this tab (first PDF)
+          final ebook = ebookContents.first;
+          return _buildInlinePdfViewer(
+            title: ebook.title,
+            pdfUrl: ebook.fileUrl,
+          );
         } else if (state is BookContentError) {
           return Center(
             child: Column(
@@ -433,209 +423,39 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildEbookList(List<dynamic> ebookContents) {
-    return ListView.builder(
-      padding: EdgeInsets.all(AppConstants.defaultPadding),
-      itemCount: ebookContents.length,
-      itemBuilder: (context, index) {
-        final ebook = ebookContents[index];
-        return _buildEbookCard(ebook);
-      },
-    );
+    // Deprecated path (list/card). Inline viewer used instead.
+    return const SizedBox.shrink();
   }
 
   Widget _buildEbookCard(dynamic ebook) {
-    return Padding(
-      padding: EdgeInsets.all(AppConstants.defaultPadding),
-      child: Column(
-        children: [
-          // PDF Preview Card
-          GestureDetector(
-            onTap: () {
-              // Navigate to PDF viewer with actual PDF data
-              context.push(
-                AppRoutes.pdfViewer,
-                extra: {
-                  'id': ebook.contentId,
-                  'title': ebook.title,
-                  'pdfUrl': ebook.fileUrl,
-                  'thumbnailUrl': '', // We don't have thumbnail from API
-                  'description': 'PDF from book content',
-                  'totalPages': 0, // We don't have page count from API
-                  'author': 'Unknown Author', // We don't have author from API
-                },
-              );
-            },
-            child: Container(
-              width: double.infinity,
-              height: 400.h,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Stack(
-                  children: [
-                    // PDF Thumbnail
-                    Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      color: Colors.grey[200],
-                      child: Icon(
-                        Icons.picture_as_pdf,
-                        size: 64.sp,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                    // Overlay with PDF icon
-                    Positioned(
-                      top: 16.h,
-                      right: 16.w,
-                      child: Container(
-                        padding: EdgeInsets.all(8.w),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.picture_as_pdf,
-                          color: Colors.white,
-                          size: 24.sp,
-                        ),
-                      ),
-                    ),
-                    // Bottom overlay with PDF info
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Container(
-                        padding: EdgeInsets.all(16.w),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.8),
-                            ],
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ebook.title,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            // SizedBox(height: 4.h),
-                            // Text(
-                            //   'File Size: ${ebook.fileSizeMb.toStringAsFixed(1)} MB',
-                            //   style: TextStyle(
-                            //     color: Colors.white70,
-                            //     fontSize: 14.sp,
-                            //   ),
-                            // ),
-                            SizedBox(height: 8.h),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.pages,
-                                  color: Colors.white70,
-                                  size: 16.sp,
-                                ),
-                                SizedBox(width: 4.w),
-                                Text(
-                                  'PDF Document',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12.sp,
-                                  ),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 12.w,
-                                    vertical: 6.h,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    'Read Now',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12.sp,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+    // Disabled per request: open PDF directly without card UI.
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildInlinePdfViewer({
+    required String title,
+    required String pdfUrl,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SfPdfViewer.network(
+            _sanitizeUrl(pdfUrl),
+            canShowScrollHead: true,
+            canShowScrollStatus: true,
           ),
-          SizedBox(height: 24.h),
-          // PDF Description
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16.w),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Description',
-                  style: TextStyle(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[800],
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                Text(
-                  ebook.title,
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    color: Colors.grey[600],
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
+  }
+
+  String _sanitizeUrl(String url) {
+    String u = url.trim();
+    if (u.endsWith('?')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
   }
 
   Widget _buildAudioTab() {
@@ -686,23 +506,7 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (audioContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.audiotrack, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No audio tracks available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return const SizedBox.shrink();
           }
 
           // Load audio data into AudioCubit
@@ -712,7 +516,7 @@ class _BookContentPageState extends State<BookContentPage>
         } else if (state is BookContentError) {
           return Center(child: Text('Error: ${state.message}'));
         }
-        return const Center(child: Text('No audio tracks'));
+        return const SizedBox.shrink();
       },
     );
   }
@@ -1374,21 +1178,8 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (videoContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'No videos available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-            );
+            // Keep it blank to avoid flicker when swiping between tabs
+            return const SizedBox.shrink();
           }
 
           return _buildVideoList(videoContents);
@@ -1422,7 +1213,8 @@ class _BookContentPageState extends State<BookContentPage>
             ),
           );
         }
-        return const Center(child: Text('No videos available'));
+        // Avoid flicker on swipe: show nothing instead of a transient empty state
+        return const SizedBox.shrink();
       },
     );
   }
@@ -1622,30 +1414,14 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (imageContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.image, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No images available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return const SizedBox.shrink();
           }
 
           return _buildImageCardStack(imageContents);
         } else if (state is BookContentError) {
           return Center(child: Text('Error: ${state.message}'));
         }
-        return const Center(child: Text('No images available'));
+        return const SizedBox.shrink();
       },
     );
   }

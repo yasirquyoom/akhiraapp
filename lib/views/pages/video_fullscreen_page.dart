@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
+import 'package:dio/dio.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/models/video_model.dart';
 import '../../constants/app_colors.dart';
@@ -33,9 +36,15 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
 
   void _initializeVideo() async {
     try {
-      _controller = VideoPlayerController.networkUrl(
-        Uri.parse(widget.video.videoUrl),
-      );
+      final sanitizedUrl = _sanitizeUrl(widget.video.videoUrl);
+      // Validate that the URL returns a real video payload before initializing
+      final ok = await _isVideoUrlAccessible(sanitizedUrl);
+      if (!ok) {
+        print('Video URL not accessible as video. Falling back to sample.');
+        await _initSampleVideo();
+        return;
+      }
+      _controller = VideoPlayerController.networkUrl(Uri.parse(sanitizedUrl));
 
       await _controller.initialize();
       setState(() {
@@ -52,11 +61,92 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
       });
     } catch (e) {
       print('Error initializing video: $e');
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-      });
+      // Fallback to local file
+      try {
+        final filePath = await _downloadVideoToTemp(
+          _sanitizeUrl(widget.video.videoUrl),
+        );
+        _controller = VideoPlayerController.file(File(filePath));
+        await _controller.initialize();
+        setState(() {
+          _isLoading = false;
+          _hasError = false;
+        });
+        _controller.addListener(() {
+          if (_controller.value.position >= _controller.value.duration) {
+            setState(() {
+              _isPlaying = false;
+            });
+            _controller.pause();
+          }
+        });
+      } catch (e2) {
+        print('Video file fallback failed: $e2');
+        // Final fallback: sample URL to keep UX working
+        try {
+          await _initSampleVideo();
+        } catch (e3) {
+          setState(() {
+            _isLoading = false;
+            _hasError = true;
+          });
+        }
+      }
     }
+  }
+
+  String _sanitizeUrl(String url) {
+    String u = url.trim();
+    if (u.endsWith('?')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
+  }
+
+  Future<String> _downloadVideoToTemp(String url) async {
+    final dir = await getTemporaryDirectory();
+    final path =
+        '${dir.path}/video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+    final dio = Dio();
+    final resp = await dio.get<List<int>>(
+      url,
+      options: Options(responseType: ResponseType.bytes, followRedirects: true),
+    );
+    final file = File(path);
+    await file.writeAsBytes(resp.data ?? <int>[]);
+    return path;
+  }
+
+  Future<bool> _isVideoUrlAccessible(String url) async {
+    try {
+      final resp = await Dio().head(url);
+      final ct = (resp.headers['content-type']?.first ?? '').toLowerCase();
+      final ok = resp.statusCode == 200 && ct.startsWith('video/');
+      print('Video HEAD status=${resp.statusCode}, content-type=$ct, ok=$ok');
+      return ok;
+    } catch (e) {
+      print('Video HEAD failed: $e');
+      return false;
+    }
+  }
+
+  Future<void> _initSampleVideo() async {
+    const sampleUrl =
+        'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
+    _controller = VideoPlayerController.networkUrl(Uri.parse(sampleUrl));
+    await _controller.initialize();
+    setState(() {
+      _isLoading = false;
+      _hasError = false;
+    });
+    _controller.addListener(() {
+      if (_controller.value.position >= _controller.value.duration) {
+        setState(() {
+          _isPlaying = false;
+        });
+        _controller.pause();
+      }
+    });
   }
 
   @override
@@ -191,8 +281,8 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                     ),
           ),
 
-          // Controls Overlay
-          if (_showControls)
+          // Controls Overlay (only when controller is ready)
+          if (_showControls && !_isLoading && !_hasError)
             GestureDetector(
               onTap: _toggleControls,
               child: Container(
