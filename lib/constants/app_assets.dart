@@ -18,6 +18,8 @@ class AppAssets {
   static const String iconVideo = 'assets/images/videos.png';
   static const String iconImages = 'assets/images/images.png';
   static const String iconQuiz = 'assets/images/quiz.png';
+  static const String downloadImage = 'assets/images/download.png';
+  static const String shareImage = 'assets/images/share_icon.png';
 
   // Account Page Icons
   static const String iconFacebook = 'assets/images/facebook.png';

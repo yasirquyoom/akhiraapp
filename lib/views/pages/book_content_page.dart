@@ -1,5 +1,8 @@
+import 'package:akhira/constants/app_assets.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'dart:math' as math;
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:akhira/data/cubits/quiz/quiz_cubit_new.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +18,9 @@ import '../../data/cubits/book/book_state.dart';
 import '../../data/cubits/book_content/book_content_state.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:gal/gal.dart';
+import 'package:dio/dio.dart';
 
 class BookContentPage extends StatefulWidget {
   final int initialTabIndex;
@@ -1579,6 +1585,74 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
   double _dragDistance = 0.0;
   bool _isDragging = false;
 
+  String _sanitizeUrlLocal(String url) {
+    var u = (url).trim();
+    if (u.endsWith('?')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
+  }
+
+  Future<void> _saveImageToGallery(String url, String fileName) async {
+    try {
+      final dio = Dio();
+      final response = await dio.get<List<int>>(
+        _sanitizeUrlLocal(url),
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final bytes = Uint8List.fromList(response.data ?? []);
+
+      final has = await Gal.hasAccess();
+      if (!has) {
+        await Gal.requestAccess();
+      }
+
+      await Gal.putImageBytes(
+        bytes,
+        album: 'Akhira',
+        name:
+            fileName.isNotEmpty
+                ? fileName
+                : 'image_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Saved to gallery')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error saving image: $e')));
+    }
+  }
+
+  Future<void> _shareImage(String url, String fileName) async {
+    try {
+      final dio = Dio();
+      final response = await dio.get<List<int>>(
+        _sanitizeUrlLocal(url),
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      final bytes = Uint8List.fromList(response.data ?? []);
+      final tempDir = await Directory.systemTemp.createTemp('share_img_');
+      final filePath =
+          '${tempDir.path}/${fileName.isNotEmpty ? fileName : 'shared_image'}.jpg';
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      await Share.shareXFiles([XFile(file.path)]);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error sharing image: $e')));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1758,6 +1832,54 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
                 );
               },
             ),
+
+            // Action buttons (Download, Share)
+            if (!isBackground)
+              Positioned(
+                top: 20,
+                right: 16,
+                child: Row(
+                  children: [
+                    // Download button
+                    GestureDetector(
+                      onTap:
+                          () => _saveImageToGallery(
+                            image.fileUrl ?? '',
+                            image.title ?? '',
+                          ),
+                      child: Container(
+                        height: 50,
+                        width: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+
+                        child: Icon(Icons.download_rounded),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    // Share button
+                    GestureDetector(
+                      onTap:
+                          () => _shareImage(
+                            image.fileUrl ?? '',
+                            image.title ?? '',
+                          ),
+                      child: Container(
+                        height: 50,
+                        width: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+
+                        child: Icon(Icons.share),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // Bottom overlay
             Positioned(
