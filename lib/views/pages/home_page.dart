@@ -1,4 +1,6 @@
 import 'package:akhira/widgets/language_toggle.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +31,7 @@ class _HomePageState extends State<HomePage> {
   late final LanguageManager _languageManager;
   final TextEditingController _bookCodeController = TextEditingController();
   bool _showAddBookModal = false;
+  List<BookModel> _lastBooks = const [];
 
   @override
   void initState() {
@@ -78,83 +81,91 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFD6DCED),
-      body: SafeArea(
-        child: BlocListener<HomeCubit, HomeState>(
-          listener: (context, state) {
-            if (state is HomeRedeemSuccess) {
-              context.showSuccessFeedback(state.message);
-              _hideAddBookDialog(); // Close modal on success
-            } else if (state is HomeRedeemError) {
-              context.showErrorFeedback(state.message);
-              _hideAddBookDialog(); // Close modal on error
-            } else if (state is HomeError) {
-              context.showErrorFeedback(state.message);
-            }
-          },
-          child: BlocBuilder<HomeCubit, HomeState>(
-            builder: (context, state) {
-              return Stack(
-                children: [
-                  // Main content
-                  Padding(
-                    padding: const EdgeInsets.all(AppConstants.defaultPadding),
-                    child: Column(
-                      children: [
-                        // Header with logo and profile
-                        Row(
-                          children: [
-                            // Logo
-                            Row(
-                              children: [
-                                Image.asset(
-                                  AppAssets.iconLogo,
-                                  width: 32,
-                                  height: 32,
-                                ),
-                                const SizedBox(width: 8),
-                                Image.asset(
-                                  AppAssets.appTextLogo,
-                                  scale: 10,
-                                  color: Colors.black,
-                                ),
-                              ],
-                            ),
-                            const Spacer(),
-                            // Language toggle
-                            LanguageToggle(languageManager: _languageManager),
-                            const SizedBox(width: 12),
-                            // Profile icon - navigate to account page
-                            GestureDetector(
-                              onTap: () => context.push(AppRoutes.account),
-                              child: Image.asset(
-                                AppAssets.profileImage,
-                                scale: 4,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const HeightSpacer(20),
-                        // Content based on state
-                        Expanded(
-                          child:
-                              state is HomeLoading
-                                  ? _buildLoadingState()
-                                  : state is HomeEmpty
-                                  ? _buildEmptyState()
-                                  : state is HomeLoaded
-                                  ? _buildLibraryState(state.books)
-                                  : const SizedBox(),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Add book modal
-                  if (_showAddBookModal) _buildAddBookModal(state),
-                ],
-              );
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFD6DCED),
+        body: SafeArea(
+          child: BlocListener<HomeCubit, HomeState>(
+            listener: (context, state) {
+              if (state is HomeLoaded) {
+                _lastBooks = state.books;
+              }
+              if (state is HomeRedeemSuccess) {
+                context.showSuccessFeedback(state.message);
+                _hideAddBookDialog(); // Close modal on success
+              } else if (state is HomeRedeemError) {
+                context.showErrorFeedback(state.message);
+                _hideAddBookDialog(); // Close modal on error
+              } else if (state is HomeError) {
+                context.showErrorFeedback(state.message);
+              }
             },
+            child: BlocBuilder<HomeCubit, HomeState>(
+              builder: (context, state) {
+                return Stack(
+                  children: [
+                    // Main content
+                    Padding(
+                      padding: const EdgeInsets.all(
+                        AppConstants.defaultPadding,
+                      ),
+                      child: Column(
+                        children: [
+                          // Header with logo and profile
+                          Row(
+                            children: [
+                              // Logo
+                              Row(
+                                children: [
+                                  Image.asset(
+                                    AppAssets.iconLogo,
+                                    width: 32,
+                                    height: 32,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Image.asset(
+                                    AppAssets.appTextLogo,
+                                    scale: 10,
+                                    color: Colors.black,
+                                  ),
+                                ],
+                              ),
+                              const Spacer(),
+                              // Language toggle
+                              LanguageToggle(languageManager: _languageManager),
+                              const SizedBox(width: 12),
+                              // Profile icon - navigate to account page
+                              GestureDetector(
+                                onTap: () => context.push(AppRoutes.account),
+                                child: Image.asset(
+                                  AppAssets.profileImage,
+                                  scale: 4,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const HeightSpacer(20),
+                          // Content based on state
+                          Expanded(
+                            child:
+                                state is HomeLoading
+                                    ? _buildLoadingState()
+                                    : state is HomeLoaded
+                                    ? _buildLibraryState(state.books)
+                                    : _lastBooks.isNotEmpty
+                                    ? _buildLibraryState(_lastBooks)
+                                    : _buildEmptyState(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Add book modal
+                    if (_showAddBookModal) _buildAddBookModal(state),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -202,6 +213,44 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
+  }
+
+  Future<bool> _onWillPop() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Exit App'),
+          content: const Text('Do you want to close the application?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('No'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Yes'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldExit == true) {
+      try {
+        if (Platform.isAndroid) {
+          SystemNavigator.pop();
+        } else if (Platform.isIOS) {
+          // iOS discourages programmatic exit; mimic by popping root
+          SystemNavigator.pop();
+        } else {
+          SystemNavigator.pop();
+        }
+      } catch (_) {}
+      return false;
+    }
+    return false;
   }
 
   Widget _buildEmptyState() {
