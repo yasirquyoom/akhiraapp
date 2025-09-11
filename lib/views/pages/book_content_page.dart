@@ -718,6 +718,8 @@ class _BookContentPageState extends State<BookContentPage>
                 children: [
                   Text(
                     state.currentTrack?.title ?? 'Title',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontFamily: 'SFPro',
                       fontWeight: FontWeight.w700,
