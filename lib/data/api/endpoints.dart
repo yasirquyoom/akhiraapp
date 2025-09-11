@@ -1,8 +1,7 @@
 class Endpoints {
   Endpoints._();
 
-  static const String baseUrl =
-      'http://q4g004cwocwso88okkwc4csg.217.76.48.185.sslip.io:8001/api';
+  static const String baseUrl = 'https://ebook-app-nznb.onrender.com/api';
 
   // Auth
   static const String register = '/user/register';
