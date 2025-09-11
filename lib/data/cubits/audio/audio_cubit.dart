@@ -210,7 +210,24 @@ class AudioCubit extends Cubit<AudioState> {
       }
 
       if (tracks.isNotEmpty) {
-        emit(AudioLoaded(tracks: tracks));
+        if (state is AudioLoaded) {
+          final current = state as AudioLoaded;
+          // Preserve currentTrack and playback state if still present
+          final currentId = current.currentTrack?.id;
+          final stillExists =
+              currentId != null && tracks.any((t) => t.id == currentId);
+          emit(
+            current.copyWith(
+              tracks: tracks,
+              currentTrack:
+                  stillExists
+                      ? (tracks.firstWhere((t) => t.id == currentId))
+                      : current.currentTrack,
+            ),
+          );
+        } else {
+          emit(AudioLoaded(tracks: tracks));
+        }
       } else {
         emit(AudioInitial());
       }

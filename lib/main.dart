@@ -79,6 +79,7 @@ class MyApp extends StatelessWidget {
                   GlobalWidgetsLocalizations.delegate,
                   GlobalCupertinoLocalizations.delegate,
                 ],
+                builder: (context, child) => child ?? const SizedBox.shrink(),
               ),
             );
           },

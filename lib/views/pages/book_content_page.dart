@@ -1,4 +1,3 @@
-import 'package:akhira/constants/app_assets.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'dart:math' as math;
 import 'dart:io';
@@ -437,15 +436,7 @@ class _BookContentPageState extends State<BookContentPage>
     );
   }
 
-  Widget _buildEbookList(List<dynamic> ebookContents) {
-    // Deprecated path (list/card). Inline viewer used instead.
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildEbookCard(dynamic ebook) {
-    // Disabled per request: open PDF directly without card UI.
-    return const SizedBox.shrink();
-  }
+  // Deprecated ebook list/card helpers removed.
 
   Widget _buildInlinePdfViewer({
     required String title,
@@ -524,8 +515,16 @@ class _BookContentPageState extends State<BookContentPage>
             return const SizedBox.shrink();
           }
 
-          // Load audio data into AudioCubit
-          context.read<AudioCubit>().loadAudioTracksFromApi(audioContents);
+          // Load audio data into AudioCubit only if not already loaded
+          final audioCubit = context.read<AudioCubit>();
+          final audioState = audioCubit.state;
+          final shouldLoad =
+              audioState is! AudioLoaded || audioState.tracks.isEmpty;
+          if (shouldLoad) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              audioCubit.loadAudioTracksFromApi(audioContents);
+            });
+          }
 
           return _buildAudioList(audioContents);
         } else if (state is BookContentError) {
@@ -1249,60 +1248,7 @@ class _BookContentPageState extends State<BookContentPage>
     );
   }
 
-  Widget _buildQuizCompleted(QuizCompleted state) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(20.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _languageManager.getText('Quiz Completed!', 'Quiz Terminé!'),
-              style: TextStyle(
-                fontFamily: 'SFPro',
-                fontWeight: FontWeight.w700,
-                fontSize: 24.sp,
-                color: Colors.black,
-              ),
-            ),
-            SizedBox(height: 16.h),
-            Text(
-              _languageManager.getText(
-                'Your score: ${state.score}/${state.totalQuestions}',
-                'Votre score: ${state.score}/${state.totalQuestions}',
-              ),
-              style: TextStyle(
-                fontFamily: 'SFPro',
-                fontWeight: FontWeight.w500,
-                fontSize: 18.sp,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            SizedBox(height: 32.h),
-            ElevatedButton(
-              onPressed: () => context.read<QuizCubit>().restartQuiz(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 16.h),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-              ),
-              child: Text(
-                _languageManager.getText('Restart', 'Recommencer'),
-                style: TextStyle(
-                  fontFamily: 'SFPro',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16.sp,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  // Deprecated quiz completed helper removed.
 
   Widget _buildVideosTab() {
     // Check if bookId is available in global state
