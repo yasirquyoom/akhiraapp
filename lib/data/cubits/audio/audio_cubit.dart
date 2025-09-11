@@ -110,6 +110,7 @@ class AudioCubit extends Cubit<AudioState> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isUserSeeking = false;
   Timer? _positionTicker;
+  bool _isStartingPlayback = false;
 
   AudioCubit() : super(AudioInitial()) {
     _setupAudioPlayer();
@@ -234,6 +235,10 @@ class AudioCubit extends Cubit<AudioState> {
   }
 
   void playTrack(AudioTrack track) async {
+    if (_isStartingPlayback) {
+      return;
+    }
+    _isStartingPlayback = true;
     print('Attempting to play track: ${track.title}');
     print('Audio URL: ${track.audioUrl}');
 
@@ -289,76 +294,122 @@ class AudioCubit extends Cubit<AudioState> {
       }
       print('Updated state');
 
-      // Play the audio directly with timeout
-      print('Playing audio directly: $sanitizedUrl (mime: $inferredMimeType)');
-      try {
+      // Prefer local fallback on iOS for WAV to avoid AVPlayer stalls
+      if (Platform.isIOS && sanitizedUrl.toLowerCase().endsWith('.wav')) {
+        final localPath = await _downloadToTemp(
+          sanitizedUrl,
+          suggestExt: '.wav',
+        );
+        print('iOS WAV: Playing local file first: $localPath');
         await _audioPlayer
-            .play(UrlSource(sanitizedUrl, mimeType: inferredMimeType))
+            .play(DeviceFileSource(localPath))
             .timeout(
-              const Duration(seconds: 20),
+              const Duration(seconds: 45),
               onTimeout: () {
-                print('Audio play timeout');
+                print('Local play timeout');
                 throw TimeoutException(
-                  'Audio play timeout',
-                  const Duration(seconds: 20),
+                  'Local play timeout',
+                  const Duration(seconds: 45),
                 );
               },
             );
-        print('Started playing audio (stream)');
+        print('Started playing audio (local WAV)');
         _startPositionTicker();
         await _refreshDurationFromPlayer();
-      } on Object catch (streamErr) {
-        print('Stream play failed: $streamErr');
-        // Fallback: download to temp and play as local file (iOS AVPlayer may fail some URLs)
+        if (state is AudioLoaded) {
+          final s = state as AudioLoaded;
+          emit(s.copyWith(isPlaying: true));
+        }
+        _isStartingPlayback = false;
+        return;
+      }
+
+      // Stream first for other types
+      print('Playing audio directly: $sanitizedUrl (mime: $inferredMimeType)');
+      await _audioPlayer
+          .play(UrlSource(sanitizedUrl, mimeType: inferredMimeType))
+          .timeout(
+            const Duration(seconds: 45),
+            onTimeout: () {
+              print('Audio play timeout');
+              throw TimeoutException(
+                'Audio play timeout',
+                const Duration(seconds: 45),
+              );
+            },
+          );
+      print('Started playing audio (stream)');
+      _startPositionTicker();
+      await _refreshDurationFromPlayer();
+      if (state is AudioLoaded) {
+        final s = state as AudioLoaded;
+        emit(s.copyWith(isPlaying: true));
+      }
+      _isStartingPlayback = false;
+      return;
+    } on Object catch (streamErr) {
+      print('Stream play failed: $streamErr');
+      // Fallback: download to temp and play as local file
+      try {
         final localPath = await _downloadToTemp(
-          sanitizedUrl,
-          suggestExt: _extFromUrl(sanitizedUrl),
+          _sanitizeUrl(track.audioUrl),
+          suggestExt: _extFromUrl(_sanitizeUrl(track.audioUrl)),
         );
         print('Playing local file fallback: $localPath');
+        await _audioPlayer
+            .play(DeviceFileSource(localPath))
+            .timeout(
+              const Duration(seconds: 45),
+              onTimeout: () {
+                print('Local play timeout');
+                throw TimeoutException(
+                  'Local play timeout',
+                  const Duration(seconds: 45),
+                );
+              },
+            );
+        print('Started playing audio (local)');
+        _startPositionTicker();
+        await _refreshDurationFromPlayer();
+        if (state is AudioLoaded) {
+          final s = state as AudioLoaded;
+          emit(s.copyWith(isPlaying: true));
+        }
+        _isStartingPlayback = false;
+        return;
+      } on Object catch (localErr) {
+        print('Local play failed: $localErr');
         try {
-          await _audioPlayer
-              .play(DeviceFileSource(localPath))
-              .timeout(
-                const Duration(seconds: 20),
-                onTimeout: () {
-                  print('Local play timeout');
-                  throw TimeoutException(
-                    'Local play timeout',
-                    const Duration(seconds: 20),
-                  );
-                },
-              );
-          print('Started playing audio (local)');
-          _startPositionTicker();
-          await _refreshDurationFromPlayer();
-        } on Object catch (localErr) {
-          print('Local play failed: $localErr');
           // Final fallback: play from bytes
-          final bytes = await _downloadBytes(sanitizedUrl);
+          final bytes = await _downloadBytes(_sanitizeUrl(track.audioUrl));
           print('Playing bytes source (${bytes.lengthInBytes} bytes)');
           await _audioPlayer
               .play(BytesSource(bytes))
               .timeout(
-                const Duration(seconds: 20),
+                const Duration(seconds: 45),
                 onTimeout: () {
                   print('Bytes play timeout');
                   throw TimeoutException(
                     'Bytes play timeout',
-                    const Duration(seconds: 20),
+                    const Duration(seconds: 45),
                   );
                 },
               );
           print('Started playing audio (bytes)');
           _startPositionTicker();
           await _refreshDurationFromPlayer();
+          if (state is AudioLoaded) {
+            final s = state as AudioLoaded;
+            emit(s.copyWith(isPlaying: true));
+          }
+          _isStartingPlayback = false;
+          return;
+        } on Object catch (bytesErr) {
+          print('Bytes play failed: $bytesErr');
         }
       }
 
       // Mark playing after successful start
-      if (state is AudioLoaded) {
-        final s = state as AudioLoaded;
-        emit(s.copyWith(isPlaying: true));
-      }
     } catch (e) {
       print('Error playing audio: $e');
       print('Error type: ${e.runtimeType}');
@@ -395,7 +446,7 @@ class AudioCubit extends Cubit<AudioState> {
             title: '${s.currentTrack?.title ?? 'Sample'} (Preview)',
             duration: '0:00',
             audioUrl: sampleUrl,
-            thumbnailUrl: '',
+            thumbnailUrl: s.currentTrack?.thumbnailUrl ?? '',
           );
           emit(
             s.copyWith(
@@ -406,6 +457,7 @@ class AudioCubit extends Cubit<AudioState> {
           );
         }
         print('Sample fallback started');
+        _isStartingPlayback = false;
         return;
       } catch (sampleErr) {
         print('Sample fallback failed: $sampleErr');

@@ -565,14 +565,33 @@ class _BookContentPageState extends State<BookContentPage>
       child: Row(
         children: [
           // Thumbnail
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: Colors.grey[200],
-            ),
-            child: Icon(Icons.audiotrack, color: Colors.grey[400], size: 30),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child:
+                (audio.coverImageUrl != null &&
+                        (audio.coverImageUrl as String).isNotEmpty)
+                    ? Image.network(
+                      _sanitizeUrl(audio.coverImageUrl as String),
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder:
+                          (_, __, ___) => Container(
+                            width: 60,
+                            height: 60,
+                            color: Colors.grey[200],
+                            child: Icon(
+                              Icons.audiotrack,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                    )
+                    : Container(
+                      width: 60,
+                      height: 60,
+                      color: Colors.grey[200],
+                      child: Icon(Icons.audiotrack, color: Colors.grey[400]),
+                    ),
           ),
           const SizedBox(width: 16),
           // Track Info
@@ -665,14 +684,30 @@ class _BookContentPageState extends State<BookContentPage>
               width: 60,
               height: 60,
               margin: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+              child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
-                  ),
-                  fit: BoxFit.cover,
-                ),
+                child:
+                    (state.currentTrack?.thumbnailUrl.isNotEmpty == true)
+                        ? Image.network(
+                          _sanitizeUrl(state.currentTrack!.thumbnailUrl),
+                          fit: BoxFit.cover,
+                          errorBuilder:
+                              (_, __, ___) => Container(
+                                color: Colors.white.withOpacity(0.2),
+                                child: const Icon(
+                                  Icons.audiotrack,
+                                  color: Colors.white,
+                                ),
+                              ),
+                        )
+                        : Container(
+                          color: Colors.white.withOpacity(0.2),
+                          child: const Icon(
+                            Icons.audiotrack,
+                            color: Colors.white,
+                          ),
+                        ),
               ),
             ),
             // Track Info
@@ -1399,16 +1434,23 @@ class _BookContentPageState extends State<BookContentPage>
             borderRadius: BorderRadius.circular(12.r),
             child: Stack(
               children: [
-                // Thumbnail Image
+                // Thumbnail: prefer content.coverImageUrl, fallback to icon
                 Positioned.fill(
-                  child: Container(
-                    color: Colors.grey[200],
-                    child: Icon(
-                      Icons.videocam,
-                      size: 64.sp,
-                      color: Colors.grey[400],
-                    ),
-                  ),
+                  child:
+                      (video.coverImageUrl != null &&
+                              (video.coverImageUrl as String).isNotEmpty)
+                          ? Image.network(
+                            _sanitizeUrl((video.coverImageUrl as String)),
+                            fit: BoxFit.cover,
+                          )
+                          : Container(
+                            color: Colors.grey[200],
+                            child: Icon(
+                              Icons.videocam,
+                              size: 64.sp,
+                              color: Colors.grey[400],
+                            ),
+                          ),
                 ),
 
                 // Play Button Overlay

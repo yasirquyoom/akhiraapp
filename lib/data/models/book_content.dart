@@ -7,6 +7,7 @@ class BookContent extends Equatable {
   final String title;
   final String fileName;
   final String fileUrl;
+  final String? coverImageUrl;
   final double fileSizeMb;
   final String mimeType;
   final int contentNumber;
@@ -20,6 +21,7 @@ class BookContent extends Equatable {
     required this.title,
     required this.fileName,
     required this.fileUrl,
+    this.coverImageUrl,
     required this.fileSizeMb,
     required this.mimeType,
     required this.contentNumber,
@@ -35,6 +37,7 @@ class BookContent extends Equatable {
       title: json['title'] as String,
       fileName: json['file_name'] as String,
       fileUrl: json['file_url'] as String,
+      coverImageUrl: json['cover_image_url'] as String?,
       fileSizeMb: (json['file_size_mb'] as num).toDouble(),
       mimeType: json['mime_type'] as String,
       contentNumber: json['content_number'] as int,
@@ -51,6 +54,7 @@ class BookContent extends Equatable {
       'title': title,
       'file_name': fileName,
       'file_url': fileUrl,
+      'cover_image_url': coverImageUrl,
       'file_size_mb': fileSizeMb,
       'mime_type': mimeType,
       'content_number': contentNumber,
@@ -67,6 +71,7 @@ class BookContent extends Equatable {
     title,
     fileName,
     fileUrl,
+    coverImageUrl,
     fileSizeMb,
     mimeType,
     contentNumber,
