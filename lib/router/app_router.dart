@@ -6,7 +6,6 @@ import 'package:akhira/views/pages/splash_page.dart';
 import 'package:akhira/views/pages/video_fullscreen_page.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../data/models/pdf_model.dart';
 import '../data/models/video_model.dart';
@@ -18,8 +17,6 @@ import '../views/pages/forgot_password_page.dart';
 import '../views/pages/home_page.dart';
 import '../views/pages/login_page.dart';
 import '../views/pages/welcome_page.dart';
-import '../data/cubits/audio/audio_cubit.dart';
-import '../core/di/service_locator.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -44,7 +41,8 @@ class AppRouter {
 
   late final GoRouter router = GoRouter(
     initialLocation: AppRoutes.splash,
-    observers: [_PauseAudioOnRouteObserver()],
+    // Removed global pause observer; we manage pause in page lifecycle/tab logic
+    observers: const [],
     routes: <RouteBase>[
       GoRoute(
         path: AppRoutes.splash,
@@ -216,35 +214,4 @@ CustomTransitionPage<void> _noTransitionPage(Widget child) {
   );
 }
 
-class _PauseAudioOnRouteObserver extends NavigatorObserver {
-  void _maybePauseAudio() {
-    try {
-      final context = navigator?.context;
-      if (context == null) return;
-      final currentPath =
-          getIt<AppRouter>().router.routeInformationProvider.value.uri.path;
-      final onPermittedScreen =
-          currentPath == AppRoutes.audioFullscreen ||
-          currentPath == AppRoutes.bookContent;
-      if (!onPermittedScreen) context.read<AudioCubit>().pauseTrack();
-    } catch (_) {}
-  }
-
-  @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    super.didPush(route, previousRoute);
-    _maybePauseAudio();
-  }
-
-  @override
-  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
-    _maybePauseAudio();
-  }
-
-  @override
-  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    super.didPop(route, previousRoute);
-    _maybePauseAudio();
-  }
-}
+// _PauseAudioOnRouteObserver removed; pause handled via page lifecycle/tab logic.

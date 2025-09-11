@@ -59,6 +59,10 @@ class _BookContentPageState extends State<BookContentPage>
     _languageManager.removeListener(_onLanguageChanged);
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    // Pause audio when leaving Book Content page entirely
+    try {
+      context.read<AudioCubit>().pauseTrack();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -464,6 +468,13 @@ class _BookContentPageState extends State<BookContentPage>
     return u;
   }
 
+  String _formatDuration(Duration d) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final m = two(d.inMinutes.remainder(60));
+    final s = two(d.inSeconds.remainder(60));
+    return '$m:$s';
+  }
+
   Widget _buildAudioTab() {
     // Check if bookId is available in global state
     final bookCubit = context.read<BookCubit>();
@@ -728,12 +739,12 @@ class _BookContentPageState extends State<BookContentPage>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    state.currentTrack?.duration ?? '45 min 3 sec',
+                    '${_formatDuration(state.currentPosition)} / ${_formatDuration(state.totalDuration)}',
                     style: const TextStyle(
                       fontFamily: 'SFPro',
                       fontWeight: FontWeight.w500,
                       fontSize: 14,
-                      color: Colors.white70, // Changed from grey to white70
+                      color: Colors.white70,
                     ),
                   ),
                 ],
