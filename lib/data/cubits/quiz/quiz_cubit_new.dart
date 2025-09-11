@@ -82,6 +82,8 @@ class QuizLoaded extends QuizState {
   final double percentage;
   final int remainingQuestions;
   final int totalQuestionsFromApi;
+  final bool isSubmitting; // submitting an answer
+  final bool isResetting; // resetting all answers
 
   const QuizLoaded({
     required this.questions,
@@ -95,6 +97,8 @@ class QuizLoaded extends QuizState {
     this.percentage = 0,
     this.remainingQuestions = 0,
     this.totalQuestionsFromApi = 0,
+    this.isSubmitting = false,
+    this.isResetting = false,
   });
 
   QuizLoaded copyWith({
@@ -109,6 +113,8 @@ class QuizLoaded extends QuizState {
     double? percentage,
     int? remainingQuestions,
     int? totalQuestionsFromApi,
+    bool? isSubmitting,
+    bool? isResetting,
   }) {
     return QuizLoaded(
       questions: questions ?? this.questions,
@@ -123,6 +129,8 @@ class QuizLoaded extends QuizState {
       remainingQuestions: remainingQuestions ?? this.remainingQuestions,
       totalQuestionsFromApi:
           totalQuestionsFromApi ?? this.totalQuestionsFromApi,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      isResetting: isResetting ?? this.isResetting,
     );
   }
 
@@ -145,6 +153,8 @@ class QuizLoaded extends QuizState {
     percentage,
     remainingQuestions,
     totalQuestionsFromApi,
+    isSubmitting,
+    isResetting,
   ];
 }
 
@@ -280,6 +290,9 @@ class QuizCubit extends Cubit<QuizState> {
     final selected = currentState.selectedOptionId;
     if (selected == null) return;
 
+    // Show submitting loader
+    emit(currentState.copyWith(isSubmitting: true));
+
     // Optimistic update for instant UX
     final isCorrect = selected == currentState.currentQuestion.correctAnswerId;
     final optimisticAnswer = QuizAnswer(
@@ -294,6 +307,7 @@ class QuizCubit extends Cubit<QuizState> {
         answers: optimisticAnswers,
         selectedOptionId: null,
         score: optimisticAnswers.where((a) => a.isCorrect).length,
+        isSubmitting: true,
       ),
     );
 
@@ -304,6 +318,13 @@ class QuizCubit extends Cubit<QuizState> {
           userAnswer: selected,
         )
         .then((_) => _refreshScore())
+        .whenComplete(() {
+          // Hide submitting loader
+          final s = state;
+          if (s is QuizLoaded) {
+            emit(s.copyWith(isSubmitting: false));
+          }
+        })
         .catchError((_) => null);
   }
 
@@ -343,10 +364,19 @@ class QuizCubit extends Cubit<QuizState> {
 
   Future<void> resetBookAnswers(String bookId) async {
     try {
+      // Show resetting loader
+      if (state is QuizLoaded) {
+        emit((state as QuizLoaded).copyWith(isResetting: true));
+      }
       await _repository.resetAnswers(bookId: bookId);
       // After reset, reload quizzes and score so the quiz appears again
       await loadQuizzesFromApi(bookId: bookId);
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      if (state is QuizLoaded) {
+        emit((state as QuizLoaded).copyWith(isResetting: false));
+      }
+    }
   }
 
   void nextQuestion() {

@@ -977,10 +977,52 @@ class _BookContentPageState extends State<BookContentPage>
             ),
           ),
           SizedBox(height: 16.h),
-          ElevatedButton(
-            onPressed: () => context.read<QuizCubit>().resetBookAnswers(bookId),
-            child: Text(
-              _languageManager.getText('Reset Answers', 'Réinitialiser'),
+          SizedBox(
+            height: 48.h,
+            child: ElevatedButton(
+              onPressed:
+                  state.isResetting
+                      ? null
+                      : () =>
+                          context.read<QuizCubit>().resetBookAnswers(bookId),
+              style: ElevatedButton.styleFrom(
+                disabledBackgroundColor: AppColors.primary.withOpacity(0.7),
+              ),
+              child:
+                  state.isResetting
+                      ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 18.w,
+                            height: 18.w,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 10.w),
+                          Text(
+                            _languageManager.getText(
+                              'Resetting...',
+                              'Réinitialisation...',
+                            ),
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16.sp,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      )
+                      : Text(
+                        _languageManager.getText(
+                          'Reset Answers',
+                          'Réinitialiser',
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                      ),
             ),
           ),
         ],
@@ -1140,7 +1182,7 @@ class _BookContentPageState extends State<BookContentPage>
                   Expanded(
                     child: ElevatedButton(
                       onPressed:
-                          state.selectedOptionId != null
+                          state.selectedOptionId != null && !state.isSubmitting
                               ? () {
                                 final cubit = context.read<QuizCubit>();
                                 cubit.submitAnswer();
@@ -1150,7 +1192,8 @@ class _BookContentPageState extends State<BookContentPage>
                               : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor:
-                            state.selectedOptionId != null
+                            state.selectedOptionId != null &&
+                                    !state.isSubmitting
                                 ? AppColors.primary
                                 : Colors.grey.shade300,
                         padding: EdgeInsets.symmetric(vertical: 16.h),
@@ -1159,25 +1202,59 @@ class _BookContentPageState extends State<BookContentPage>
                         ),
                         elevation: 0,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            state.isLastQuestion
-                                ? _languageManager.getText('Submit', 'Envoyer')
-                                : _languageManager.getText('Next', 'Suivant'),
-                            style: TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16.sp,
-                              color:
-                                  state.selectedOptionId != null
-                                      ? Colors.white
-                                      : Colors.grey.shade600,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child:
+                          state.isSubmitting
+                              ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 18.w,
+                                    height: 18.w,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  SizedBox(width: 10.w),
+                                  Text(
+                                    _languageManager.getText(
+                                      'Submitting...',
+                                      'Envoi...',
+                                    ),
+                                    style: TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              )
+                              : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    state.isLastQuestion
+                                        ? _languageManager.getText(
+                                          'Submit',
+                                          'Envoyer',
+                                        )
+                                        : _languageManager.getText(
+                                          'Next',
+                                          'Suivant',
+                                        ),
+                                    style: TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 16.sp,
+                                      color:
+                                          state.selectedOptionId != null
+                                              ? Colors.white
+                                              : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                     ),
                   ),
                 ],
