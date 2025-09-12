@@ -48,12 +48,26 @@ class _LoginPageState extends State<LoginPage> {
     setState(() {});
   }
 
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
   void _login() {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       context.showWarningFeedback(
         _languageManager.getText(
           'Please fill all fields',
           'Veuillez remplir tous les champs',
+        ),
+      );
+      return;
+    }
+
+    if (!_isValidEmail(_emailController.text.trim())) {
+      context.showErrorFeedback(
+        _languageManager.getText(
+          'Please enter a valid email address',
+          'Veuillez saisir une adresse e-mail valide',
         ),
       );
       return;
@@ -165,18 +179,10 @@ class _LoginPageState extends State<LoginPage> {
                   bloc: _authCubit,
                   builder: (context, state) {
                     return CustomButton(
-                      label:
-                          state.status == AuthStatus.loading
-                              ? _languageManager.getText(
-                                'Logging in...',
-                                'Connexion...',
-                              )
-                              : _languageManager.getText(
-                                'Login',
-                                'Se connecter',
-                              ),
+                      label: _languageManager.getText('Login', 'Se connecter'),
                       onPressed:
                           state.status == AuthStatus.loading ? null : _login,
+                      isLoading: state.status == AuthStatus.loading,
                       useGradient: true,
                     );
                   },
@@ -192,7 +198,7 @@ class _LoginPageState extends State<LoginPage> {
                       },
                       child: Text(
                         _languageManager.getText(
-                          'Forget account',
+                          'Forgot account',
                           'Mot de passe oublié',
                         ),
                         style: const TextStyle(

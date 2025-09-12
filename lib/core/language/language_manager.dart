@@ -5,7 +5,7 @@ enum AppLanguage { english, french }
 
 class LanguageManager extends ChangeNotifier {
   static const String _languageKey = 'app_language';
-  AppLanguage _currentLanguage = AppLanguage.english;
+  AppLanguage _currentLanguage = AppLanguage.french;
 
   AppLanguage get currentLanguage => _currentLanguage;
 
@@ -19,7 +19,7 @@ class LanguageManager extends ChangeNotifier {
     if (languageCode != null) {
       _currentLanguage = AppLanguage.values.firstWhere(
         (lang) => lang.name == languageCode,
-        orElse: () => AppLanguage.english,
+        orElse: () => AppLanguage.french,
       );
       notifyListeners();
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import '../constants/app_colors.dart';
 
 class CustomButton extends StatelessWidget {
@@ -25,16 +26,7 @@ class CustomButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final child =
         isLoading
-            ? SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  textColor ?? Theme.of(context).colorScheme.onPrimary,
-                ),
-              ),
-            )
+            ? const _LottieDotsLoader()
             : Text(
               label,
               style: TextStyle(
@@ -46,28 +38,31 @@ class CustomButton extends StatelessWidget {
 
     final content = Center(child: child);
 
-    final enabled = onPressed != null && !isLoading;
-
-    if (useGradient && enabled) {
+    if (useGradient) {
       final gradient = const LinearGradient(
         colors: [AppColors.primaryGradientStart, AppColors.primaryGradientEnd],
       );
       final button = InkWell(
-        onTap: onPressed,
+        onTap: isLoading ? null : onPressed,
         borderRadius: BorderRadius.circular(12),
-        child: Ink(
+        child: Container(
           decoration: BoxDecoration(
             gradient: gradient,
             borderRadius: BorderRadius.circular(25),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
           height: 50,
-          child: DefaultTextStyle(
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-            child: content,
+          child: Center(
+            child:
+                isLoading
+                    ? content
+                    : DefaultTextStyle(
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      child: content,
+                    ),
           ),
         ),
       );
@@ -76,7 +71,7 @@ class CustomButton extends StatelessWidget {
           : button;
     } else {
       final button = ElevatedButton(
-        onPressed: onPressed,
+        onPressed: isLoading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(25),
@@ -93,5 +88,25 @@ class CustomButton extends StatelessWidget {
           ? SizedBox(width: double.infinity, child: button)
           : button;
     }
+  }
+}
+
+class _LottieDotsLoader extends StatelessWidget {
+  const _LottieDotsLoader();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 100,
+      child: ColorFiltered(
+        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
+        child: Lottie.asset(
+          'assets/icons/loading.json',
+          fit: BoxFit.contain,
+          repeat: true,
+          animate: true,
+        ),
+      ),
+    );
   }
 }

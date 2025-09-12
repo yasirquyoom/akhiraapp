@@ -411,18 +411,17 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const HeightSpacer(24),
                   // Verify button
-                  state is HomeRedeeming
-                      ? const Center(child: CircularProgressIndicator())
-                      : CustomButton(
-                        label: _languageManager.getText(
-                          'Verify code',
-                          'Vérifier le code',
-                        ),
-                        onPressed: _addBook,
-                        useGradient: false,
-                        backgroundColor: AppColors.primary,
-                        textColor: Colors.white,
-                      ),
+                  CustomButton(
+                    label: _languageManager.getText(
+                      'Verify code',
+                      'Vérifier le code',
+                    ),
+                    onPressed: _addBook,
+                    isLoading: state is HomeRedeeming,
+                    useGradient: true,
+                    backgroundColor: AppColors.primary,
+                    textColor: Colors.white,
+                  ),
                   const HeightSpacer(16),
                   // Cancel button
                   Center(

@@ -50,6 +50,10 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
     setState(() {});
   }
 
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
   void _register() {
     if (_fullNameController.text.isEmpty ||
         _emailController.text.isEmpty ||
@@ -62,6 +66,21 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
               'Veuillez remplir tous les champs',
             ),
           ),
+        ),
+      );
+      return;
+    }
+
+    if (!_isValidEmail(_emailController.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _languageManager.getText(
+              'Please enter a valid email address',
+              'Veuillez saisir une adresse e-mail valide',
+            ),
+          ),
+          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -188,15 +207,10 @@ class _CreateAccountPageState extends State<CreateAccountPage> {
                   bloc: _authCubit,
                   builder: (context, state) {
                     return CustomButton(
-                      label:
-                          state.status == AuthStatus.loading
-                              ? _languageManager.getText(
-                                'Creating...',
-                                'Création...',
-                              )
-                              : _languageManager.getText('Create', 'Créer'),
+                      label: _languageManager.getText('Create', 'Créer'),
                       onPressed:
                           state.status == AuthStatus.loading ? null : _register,
+                      isLoading: state.status == AuthStatus.loading,
                       useGradient: true,
                     );
                   },

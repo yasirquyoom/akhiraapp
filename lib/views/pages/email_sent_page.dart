@@ -94,6 +94,15 @@ class _EmailSentPageState extends State<EmailSentPage> {
             padding: const EdgeInsets.all(AppConstants.defaultPadding),
             child: Column(
               children: [
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: BackButton(
+                    color: Colors.white,
+                    onPressed: () {
+                      context.go(AppRoutes.login);
+                    },
+                  ),
+                ),
                 // Language toggle in top right
                 Align(
                   alignment: Alignment.topRight,

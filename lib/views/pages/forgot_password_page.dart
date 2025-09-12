@@ -45,6 +45,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     setState(() {});
   }
 
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
   void _sendResetLink() {
     if (_emailController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,6 +59,21 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               'Veuillez saisir votre e-mail',
             ),
           ),
+        ),
+      );
+      return;
+    }
+
+    if (!_isValidEmail(_emailController.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _languageManager.getText(
+              'Please enter a valid email address',
+              'Veuillez saisir une adresse e-mail valide',
+            ),
+          ),
+          backgroundColor: Colors.red,
         ),
       );
       return;
@@ -166,20 +185,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                   bloc: _authCubit,
                   builder: (context, state) {
                     return CustomButton(
-                      label:
-                          state.status == AuthStatus.loading
-                              ? _languageManager.getText(
-                                'Sending...',
-                                'Envoi...',
-                              )
-                              : _languageManager.getText(
-                                'Confirm',
-                                'Confirmer',
-                              ),
+                      label: _languageManager.getText('Confirm', 'Confirmer'),
                       onPressed:
                           state.status == AuthStatus.loading
                               ? null
                               : _sendResetLink,
+                      isLoading: state.status == AuthStatus.loading,
                       useGradient: true,
                     );
                   },
