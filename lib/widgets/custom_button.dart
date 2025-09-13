@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../constants/app_colors.dart';
 
 class CustomButton extends StatelessWidget {
@@ -26,7 +26,7 @@ class CustomButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final child =
         isLoading
-            ? const _LottieDotsLoader()
+            ? const _StaggeredDotsLoader()
             : Text(
               label,
               style: TextStyle(
@@ -91,21 +91,15 @@ class CustomButton extends StatelessWidget {
   }
 }
 
-class _LottieDotsLoader extends StatelessWidget {
-  const _LottieDotsLoader();
+class _StaggeredDotsLoader extends StatelessWidget {
+  const _StaggeredDotsLoader();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 100,
-      child: ColorFiltered(
-        colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-        child: Lottie.asset(
-          'assets/icons/loading.json',
-          fit: BoxFit.contain,
-          repeat: true,
-          animate: true,
-        ),
+    return Center(
+      child: LoadingAnimationWidget.staggeredDotsWave(
+        color: Colors.white,
+        size: 30,
       ),
     );
   }
