@@ -130,8 +130,8 @@ class _LoginPageState extends State<LoginPage> {
                 const HeightSpacer(8),
                 Text(
                   _languageManager.getText(
-                    'Bienvenue',
-                    'Bon detour" you correct\nto "Bienvenue',
+                    'Please enter your email and password to continue.',
+                    'Veuillez entrer votre e-mail et mot de passe pour continuer.',
                   ),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
