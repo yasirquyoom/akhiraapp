@@ -276,7 +276,12 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
           // Progress Bar
           _buildProgressBar(state),
 
-          SizedBox(height: 20.h),
+          SizedBox(height: 10.h),
+
+          // Speed Control
+          _buildSpeedControl(state),
+
+          SizedBox(height: 10.h),
 
           // Control Buttons
           _buildControlButtons(state),
@@ -362,6 +367,79 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
                 ),
               ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpeedControl(AudioLoaded state) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Speed down button
+        GestureDetector(
+          onTap: () => context.read<AudioCubit>().decreaseSpeed(),
+          child: Container(
+            width: 40.w,
+            height: 40.w,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.remove, color: Colors.white, size: 20.sp),
+          ),
+        ),
+
+        SizedBox(width: 16.w),
+
+        // Speed display
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(20.r),
+          ),
+          child: Text(
+            '${state.playbackSpeed.toStringAsFixed(1)}x',
+            style: TextStyle(
+              fontFamily: 'SFPro',
+              fontWeight: FontWeight.w600,
+              fontSize: 16.sp,
+              color: Colors.white,
+            ),
+          ),
+        ),
+
+        SizedBox(width: 16.w),
+
+        // Speed up button
+        GestureDetector(
+          onTap: () => context.read<AudioCubit>().increaseSpeed(),
+          child: Container(
+            width: 40.w,
+            height: 40.w,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.add, color: Colors.white, size: 20.sp),
+          ),
+        ),
+
+        SizedBox(width: 16.w),
+
+        // Reset speed button
+        GestureDetector(
+          onTap: () => context.read<AudioCubit>().resetSpeed(),
+          child: Container(
+            width: 40.w,
+            height: 40.w,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.refresh, color: Colors.white, size: 20.sp),
           ),
         ),
       ],

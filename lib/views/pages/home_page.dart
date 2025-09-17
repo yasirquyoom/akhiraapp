@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/app_assets.dart';
@@ -18,6 +19,7 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_feedback.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/height_spacer.dart';
+import '../../widgets/social_media_links.dart';
 import '../../widgets/shimmer_book_card.dart';
 
 class HomePage extends StatefulWidget {
@@ -404,6 +406,7 @@ class _HomePageState extends State<HomePage> {
                   // Input field
                   CustomTextField(
                     controller: _bookCodeController,
+                    underlineColor: AppColors.primary,
                     hintText: _languageManager.getText(
                       'Enter book code',
                       'Entrez le code du livre',
@@ -438,6 +441,22 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
+                  // const HeightSpacer(32),
+                  // // Social Media Links
+                  // Text(
+                  //   _languageManager.getText(
+                  //     'Follow us on social media',
+                  //     'Suivez-nous sur les réseaux sociaux',
+                  //   ),
+                  //   style: TextStyle(
+                  //     fontSize: 16.0,
+                  //     fontWeight: FontWeight.w600,
+                  //     color: Colors.black,
+                  //   ),
+                  //   textAlign: TextAlign.center,
+                  // ),
+                  // const HeightSpacer(16),
+                  // SocialMediaLinks(iconSize: 28.0, showLabels: true),
                   const HeightSpacer(16),
                 ],
               ),

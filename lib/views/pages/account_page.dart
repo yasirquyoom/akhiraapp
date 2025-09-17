@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../constants/app_assets.dart';
 import '../../core/language/language_manager.dart';
 import '../../data/cubits/auth/auth_cubit.dart';
+import '../../data/services/url_launcher_service.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
 
@@ -96,31 +96,10 @@ class _AccountPageState extends State<AccountPage> {
     );
   }
 
-  Future<void> _openTelegram() async {
-    const url =
-        'https://t.me/akhira_app'; // Replace with actual Telegram channel
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _languageManager.getText(
-              'Could not open Telegram',
-              'Impossible d\'ouvrir Telegram',
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
   Future<void> _openFacebook() async {
-    const url =
-        'https://facebook.com/akhira_app'; // Replace with actual Facebook page
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
+    try {
+      await UrlLauncherService.openFacebook();
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -135,17 +114,32 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   Future<void> _openInstagram() async {
-    const url =
-        'https://instagram.com/akhira_app'; // Replace with actual Instagram page
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
-    } else {
+    try {
+      await UrlLauncherService.openInstagram();
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             _languageManager.getText(
               'Could not open Instagram',
               'Impossible d\'ouvrir Instagram',
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openContactPage() async {
+    try {
+      await UrlLauncherService.openContactPage();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _languageManager.getText(
+              'Could not open contact page',
+              'Impossible d\'ouvrir la page de contact',
             ),
           ),
         ),
@@ -272,18 +266,17 @@ class _AccountPageState extends State<AccountPage> {
 
           SizedBox(height: 16.h),
 
-          // Telegram
-          _buildSocialMenuItem(
-            icon: AppAssets.iconTelegram,
-            title: _languageManager.getText(
-              'Join Telegram channel',
-              'Rejoignez la chaîne Telegram',
-            ),
-            onTap: _openTelegram,
-            iconColor: const Color(0xFF0088CC),
-          ),
-
-          SizedBox(height: 16.h),
+          // // Telegram
+          // _buildSocialMenuItem(
+          //   icon: AppAssets.iconTelegram,
+          //   title: _languageManager.getText(
+          //     'Join Telegram channel',
+          //     'Rejoignez la chaîne Telegram',
+          //   ),
+          //   onTap: _openTelegram,
+          //   iconColor: const Color(0xFF0088CC),
+          // ),
+          // SizedBox(height: 16.h),
 
           // Facebook
           _buildSocialMenuItem(
@@ -307,6 +300,16 @@ class _AccountPageState extends State<AccountPage> {
             ),
             onTap: _openInstagram,
             iconColor: const Color(0xFFE4405F),
+          ),
+
+          SizedBox(height: 16.h),
+
+          // Contact Page
+          _buildSocialMenuItem(
+            icon: AppAssets.profileImage, // You may need to add this icon
+            title: _languageManager.getText('Contact Us', 'Contactez-nous'),
+            onTap: _openContactPage,
+            iconColor: const Color(0xFF0C1138),
           ),
         ],
       ),

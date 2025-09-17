@@ -20,11 +20,37 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
   bool _isLoading = true;
   bool _hasError = false;
   String? _errorMessage;
+  double _currentZoomLevel = 1.0;
 
   @override
   void initState() {
     super.initState();
     _pdfViewerController = PdfViewerController();
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _currentZoomLevel = (_currentZoomLevel + 0.25).clamp(0.5, 3.0);
+      _pdfViewerController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _currentZoomLevel = (_currentZoomLevel - 0.25).clamp(0.5, 3.0);
+      _pdfViewerController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  void _resetZoom() {
+    setState(() {
+      _currentZoomLevel = 1.0;
+      _pdfViewerController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  String _getZoomPercentage() {
+    return '${(_currentZoomLevel * 100).round()}%';
   }
 
   @override
@@ -48,19 +74,42 @@ class _PdfViewerPageState extends State<PdfViewerPage> {
         ),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.zoom_in, color: Colors.black),
-            onPressed: () {
-              _pdfViewerController.zoomLevel =
-                  _pdfViewerController.zoomLevel + 0.25;
-            },
+          // Zoom level display
+          Center(
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+              margin: EdgeInsets.only(right: 8.w),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Text(
+                _getZoomPercentage(),
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
           ),
+          // Zoom out button
           IconButton(
             icon: const Icon(Icons.zoom_out, color: Colors.black),
-            onPressed: () {
-              _pdfViewerController.zoomLevel =
-                  _pdfViewerController.zoomLevel - 0.25;
-            },
+            onPressed: _currentZoomLevel > 0.5 ? _zoomOut : null,
+            tooltip: 'Zoom Out',
+          ),
+          // Reset zoom button
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black),
+            onPressed: _currentZoomLevel != 1.0 ? _resetZoom : null,
+            tooltip: 'Reset Zoom',
+          ),
+          // Zoom in button
+          IconButton(
+            icon: const Icon(Icons.zoom_in, color: Colors.black),
+            onPressed: _currentZoomLevel < 3.0 ? _zoomIn : null,
+            tooltip: 'Zoom In',
           ),
         ],
       ),

@@ -193,6 +193,9 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
                   const HeightSpacer(32),
                   // Content Options Grid
                   _buildContentGrid(book),
+                  const HeightSpacer(
+                    24,
+                  ), // Additional bottom spacing for better scroll experience
                 ],
               ),
             ),
@@ -355,6 +358,7 @@ class _BookDetailsPageState extends State<BookDetailsPage> {
             ),
           ),
         ),
+        const HeightSpacer(32), // Add bottom spacing after Images card
       ],
     );
   }

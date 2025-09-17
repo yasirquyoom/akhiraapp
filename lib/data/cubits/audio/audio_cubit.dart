@@ -61,6 +61,7 @@ class AudioLoaded extends AudioState {
   final bool isPlaying;
   final Duration currentPosition;
   final Duration totalDuration;
+  final double playbackSpeed;
 
   const AudioLoaded({
     required this.tracks,
@@ -68,6 +69,7 @@ class AudioLoaded extends AudioState {
     this.isPlaying = false,
     this.currentPosition = Duration.zero,
     this.totalDuration = Duration.zero,
+    this.playbackSpeed = 1.0,
   });
 
   @override
@@ -77,6 +79,7 @@ class AudioLoaded extends AudioState {
     isPlaying,
     currentPosition,
     totalDuration,
+    playbackSpeed,
   ];
 
   AudioLoaded copyWith({
@@ -85,6 +88,7 @@ class AudioLoaded extends AudioState {
     bool? isPlaying,
     Duration? currentPosition,
     Duration? totalDuration,
+    double? playbackSpeed,
   }) {
     return AudioLoaded(
       tracks: tracks ?? this.tracks,
@@ -92,6 +96,7 @@ class AudioLoaded extends AudioState {
       isPlaying: isPlaying ?? this.isPlaying,
       currentPosition: currentPosition ?? this.currentPosition,
       totalDuration: totalDuration ?? this.totalDuration,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
     );
   }
 }
@@ -691,6 +696,44 @@ class AudioCubit extends Cubit<AudioState> {
         _isUserSeeking = false;
       }
     }
+  }
+
+  // Speed control methods
+  void setPlaybackSpeed(double speed) async {
+    if (state is AudioLoaded) {
+      try {
+        // Clamp speed between 0.5x and 2.0x
+        final clampedSpeed = speed.clamp(0.5, 2.0);
+        await _audioPlayer.setPlaybackRate(clampedSpeed);
+
+        final currentState = state as AudioLoaded;
+        emit(currentState.copyWith(playbackSpeed: clampedSpeed));
+      } catch (e) {
+        print('Error setting playback speed: $e');
+      }
+    }
+  }
+
+  void increaseSpeed() {
+    if (state is AudioLoaded) {
+      final currentState = state as AudioLoaded;
+      final currentSpeed = currentState.playbackSpeed;
+      final newSpeed = (currentSpeed + 0.25).clamp(0.5, 2.0);
+      setPlaybackSpeed(newSpeed);
+    }
+  }
+
+  void decreaseSpeed() {
+    if (state is AudioLoaded) {
+      final currentState = state as AudioLoaded;
+      final currentSpeed = currentState.playbackSpeed;
+      final newSpeed = (currentSpeed - 0.25).clamp(0.5, 2.0);
+      setPlaybackSpeed(newSpeed);
+    }
+  }
+
+  void resetSpeed() {
+    setPlaybackSpeed(1.0);
   }
 
   // Test method to debug audio issues

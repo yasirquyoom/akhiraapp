@@ -36,6 +36,8 @@ class _BookContentPageState extends State<BookContentPage>
   late final LanguageManager _languageManager;
   late TabController _tabController;
   int _currentTabIndex = 0;
+  late PdfViewerController _pdfViewerController;
+  double _currentZoomLevel = 1.0;
 
   @override
   void initState() {
@@ -48,6 +50,7 @@ class _BookContentPageState extends State<BookContentPage>
       vsync: this,
       initialIndex: _currentTabIndex,
     );
+    _pdfViewerController = PdfViewerController();
     _tabController.addListener(_onTabChanged);
 
     // Load all book content initially
@@ -68,6 +71,31 @@ class _BookContentPageState extends State<BookContentPage>
 
   void _onLanguageChanged() {
     setState(() {});
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _currentZoomLevel = (_currentZoomLevel + 0.25).clamp(0.5, 3.0);
+      _pdfViewerController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _currentZoomLevel = (_currentZoomLevel - 0.25).clamp(0.5, 3.0);
+      _pdfViewerController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  void _resetZoom() {
+    setState(() {
+      _currentZoomLevel = 1.0;
+      _pdfViewerController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  String _getZoomPercentage() {
+    return '${(_currentZoomLevel * 100).round()}%';
   }
 
   void _onTabChanged() {
@@ -449,9 +477,94 @@ class _BookContentPageState extends State<BookContentPage>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Zoom controls bar
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            border: Border(
+              bottom: BorderSide(color: Colors.grey[300]!, width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              // Zoom level display
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8.r),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Text(
+                  _getZoomPercentage(),
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              // Zoom out button
+              IconButton(
+                icon: Icon(
+                  Icons.zoom_out,
+                  color: _currentZoomLevel > 0.5 ? Colors.black87 : Colors.grey,
+                  size: 20.sp,
+                ),
+                onPressed: _currentZoomLevel > 0.5 ? _zoomOut : null,
+                tooltip: 'Zoom Out',
+                padding: EdgeInsets.all(8.w),
+                constraints: BoxConstraints(minWidth: 40.w, minHeight: 40.h),
+              ),
+              // Reset zoom button
+              IconButton(
+                icon: Icon(
+                  Icons.refresh,
+                  color:
+                      _currentZoomLevel != 1.0 ? Colors.black87 : Colors.grey,
+                  size: 20.sp,
+                ),
+                onPressed: _currentZoomLevel != 1.0 ? _resetZoom : null,
+                tooltip: 'Reset Zoom',
+                padding: EdgeInsets.all(8.w),
+                constraints: BoxConstraints(minWidth: 40.w, minHeight: 40.h),
+              ),
+              // Zoom in button
+              IconButton(
+                icon: Icon(
+                  Icons.zoom_in,
+                  color: _currentZoomLevel < 3.0 ? Colors.black87 : Colors.grey,
+                  size: 20.sp,
+                ),
+                onPressed: _currentZoomLevel < 3.0 ? _zoomIn : null,
+                tooltip: 'Zoom In',
+                padding: EdgeInsets.all(8.w),
+                constraints: BoxConstraints(minWidth: 40.w, minHeight: 40.h),
+              ),
+              const Spacer(),
+              // PDF title
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+        // PDF viewer
         Expanded(
           child: SfPdfViewer.network(
             _sanitizeUrl(pdfUrl),
+            controller: _pdfViewerController,
             canShowScrollHead: true,
             canShowScrollStatus: true,
           ),

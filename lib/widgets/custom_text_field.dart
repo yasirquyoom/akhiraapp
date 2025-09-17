@@ -10,6 +10,7 @@ class CustomTextField extends StatelessWidget {
   final Widget? prefixIcon;
   final Widget? suffixIcon;
   final Color? backgroundColor;
+  final Color? underlineColor;
 
   const CustomTextField({
     super.key,
@@ -20,6 +21,7 @@ class CustomTextField extends StatelessWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.backgroundColor,
+    this.underlineColor,
   });
 
   @override
@@ -36,13 +38,22 @@ class CustomTextField extends StatelessWidget {
         filled: true,
         fillColor: Colors.transparent,
         border: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+          borderSide: BorderSide(
+            color: underlineColor ?? Colors.grey.shade300,
+            width: 1,
+          ),
         ),
         enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+          borderSide: BorderSide(
+            color: underlineColor ?? Colors.grey.shade300,
+            width: 1,
+          ),
         ),
         focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+          borderSide: BorderSide(
+            color: underlineColor ?? AppColors.primary,
+            width: 2,
+          ),
         ),
         errorBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: Colors.red, width: 1),

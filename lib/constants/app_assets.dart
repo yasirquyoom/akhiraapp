@@ -24,6 +24,7 @@ class AppAssets {
   // Account Page Icons
   static const String iconFacebook = 'assets/images/facebook.png';
   static const String iconInstagram = 'assets/images/instagram.png';
+  static const String iconContact = 'assets/images/contact.png';
   static const String iconLogout = 'assets/images/logout.png';
   static const String iconPrivacyPolicy = 'assets/images/privacy_policy.png';
   static const String iconRating = 'assets/images/rating.png';
