@@ -153,16 +153,9 @@ class AppRouter {
           final pdfData = state.extra as Map<String, dynamic>?;
 
           if (pdfData != null) {
-            final pdf = PdfModel(
-              id: pdfData['id'] ?? 'unknown',
-              title: pdfData['title'] ?? 'Unknown PDF',
-              pdfUrl: pdfData['pdfUrl'] ?? '',
-              thumbnailUrl: pdfData['thumbnailUrl'] ?? '',
-              description: pdfData['description'] ?? 'PDF from book content',
-              totalPages: pdfData['totalPages'] ?? 0,
-              author: pdfData['author'] ?? 'Unknown Author',
-            );
-
+            // Use API response's file_url for pdfUrl
+            final pdfUrl = (pdfData['file_url'] ?? pdfData['pdfUrl'] ?? '') as String;
+            final pdf = PdfModel(pdfUrl: pdfUrl);
             return _noTransitionPage(PdfViewerPage(pdf: pdf));
           }
 
@@ -170,16 +163,8 @@ class AppRouter {
           return _noTransitionPage(
             PdfViewerPage(
               pdf: const PdfModel(
-                id: '1',
-                title: 'Introduction to Islamic Studies',
                 pdfUrl:
                     'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-                thumbnailUrl:
-                    'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&h=400&fit=crop',
-                description:
-                    'A comprehensive guide to Islamic studies covering fundamental concepts, history, and practices.',
-                totalPages: 25,
-                author: 'Dr. Ahmed Hassan',
               ),
             ),
           );

@@ -1,8 +1,6 @@
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'dart:math' as math;
 import 'dart:io';
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:akhira/data/cubits/quiz/quiz_cubit_new.dart';
 import 'package:flutter/cupertino.dart';
@@ -24,6 +22,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import '../../services/pdf_cache_service.dart';
 import '../../data/models/book_content.dart';
+import '../../data/services/url_launcher_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class BookContentPage extends StatefulWidget {
   final int initialTabIndex;
@@ -347,13 +347,8 @@ class _BookContentPageState extends State<BookContentPage>
 
   void _openInNewTab(String url) {
     final u = _sanitizeUrl(url);
-    if (kIsWeb) {
-      try {
-        html.window.open(u, '_blank');
-      } catch (_) {
-        html.window.location.href = u;
-      }
-    }
+    // Use platform-safe launcher; on web it opens in a new tab, on mobile opens externally
+    UrlLauncherService.openUrl(u);
   }
 
   void _filterContentForCurrentTab() {
@@ -1205,7 +1200,11 @@ class _BookContentPageState extends State<BookContentPage>
                 title: audio.title,
                 duration: '0:00', // We don't have duration from API
                 audioUrl: audio.fileUrl ?? '',
-                thumbnailUrl: '', // BookContent doesn't have thumbnailUrl field
+                // Prefer coverImageUrl if available for dynamic artwork
+                thumbnailUrl: (audio.coverImageUrl != null &&
+                        (audio.coverImageUrl as String).isNotEmpty)
+                    ? (audio.coverImageUrl as String)
+                    : '',
               );
 
               // Start playing the audio track
@@ -1582,8 +1581,8 @@ class _BookContentPageState extends State<BookContentPage>
                       )
                       : Text(
                         _languageManager.getText(
-                          'Reset Answers',
-                          'Réinitialiser',
+                          'Reset Quiz',
+                          'Réinitialiser le quiz',
                         ),
                         style: const TextStyle(color: Colors.white),
                       ),
@@ -1748,10 +1747,9 @@ class _BookContentPageState extends State<BookContentPage>
                       onPressed:
                           state.selectedOptionId != null && !state.isSubmitting
                               ? () {
-                                final cubit = context.read<QuizCubit>();
-                                cubit.submitAnswer();
-                                cubit.refreshBookScore(bookId);
-                                cubit.nextQuestion();
+                                context
+                                    .read<QuizCubit>()
+                                    .submitAndAdvance(bookId: bookId);
                               }
                               : null,
                       style: ElevatedButton.styleFrom(
@@ -2252,15 +2250,8 @@ class _ImageCardStackWidget extends StatefulWidget {
 
 class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  late AnimationController _verticalAnimationController;
-  late Animation<double> _animation;
-  late Animation<double> _verticalAnimation;
   int _currentIndex = 0;
-  double _dragDistance = 0.0;
-  double _verticalDragDistance = 0.0;
-  bool _isDragging = false;
-  bool _isVerticalDragging = false;
+  late final PageController _pageController;
 
   String _sanitizeUrlLocal(String url) {
     var u = (url).trim();
@@ -2305,99 +2296,40 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
+    _pageController = PageController(
+      initialPage: _currentIndex,
+      viewportFraction: 1.0,
+      keepPage: true,
     );
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
-    );
-    
-    _verticalAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _verticalAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _verticalAnimationController, curve: Curves.easeInOutCubic),
-    );
+    // Prefetch initial adjacent images for smoother swiping
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _prefetchAdjacent(_currentIndex);
+    });
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _verticalAnimationController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanStart: (details) {
-        _isDragging = true;
-        _isVerticalDragging = true;
-      },
-      onPanUpdate: (details) {
-        if (_isDragging || _isVerticalDragging) {
-          setState(() {
-            _dragDistance += details.delta.dx;
-            _verticalDragDistance += details.delta.dy;
-          });
-        }
-      },
-      onPanEnd: (details) {
-        _isDragging = false;
-        _isVerticalDragging = false;
-
-        // Determine swipe direction and velocity
-        final horizontalVelocity = details.velocity.pixelsPerSecond.dx;
-        final verticalVelocity = details.velocity.pixelsPerSecond.dy;
-        final dragThreshold = 80.0;
-        final velocityThreshold = 400.0;
-
-        // Check if vertical gesture is more dominant
-        if (_verticalDragDistance.abs() > _dragDistance.abs() && _verticalDragDistance.abs() > 30.0) {
-          // Vertical swipe detected
-          if (_verticalDragDistance.abs() > dragThreshold || verticalVelocity.abs() > velocityThreshold) {
-            if (_verticalDragDistance < 0 || verticalVelocity < 0) {
-              // Swipe up - next image with vertical animation
-              _nextImageVertical();
-            } else {
-              // Swipe down - previous image with vertical animation
-              _previousImageVertical();
-            }
-          }
-        } else if (_dragDistance.abs() > 30.0) {
-          // Horizontal swipe detected
-          if (_dragDistance.abs() > dragThreshold || horizontalVelocity.abs() > velocityThreshold) {
-            if (_dragDistance > 0 || horizontalVelocity > 0) {
-              // Swipe right - previous image
-              _previousImage();
-            } else {
-              // Swipe left - next image
-              _nextImage();
-            }
-          }
-        }
-
-        // Reset drag distances
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: widget.imageContents.length,
+      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      allowImplicitScrolling: true,
+      onPageChanged: (index) {
         setState(() {
-          _dragDistance = 0.0;
-          _verticalDragDistance = 0.0;
+          _currentIndex = index;
         });
+        _prefetchAdjacent(index);
       },
-      child: SizedBox(
-        width: double.infinity,
-        height: double.infinity,
-        child: Stack(
-          children: [
-            // Background cards (stacked behind)
-            ..._buildBackgroundCards(),
-
-            // Main card (on top)
-            _buildMainCard(),
-          ],
-        ),
-      ),
+      itemBuilder: (context, index) {
+        final image = widget.imageContents[index];
+        return _buildCard(image);
+      },
     );
   }
 
@@ -2450,50 +2382,25 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     return cards.reversed.toList(); // Reverse to show cards in correct order
   }
 
-  Widget _buildMainCard() {
-    final currentImage = widget.imageContents[_currentIndex];
-    final rotation = _dragDistance * 0.001; // Convert drag distance to rotation
-    final opacity = math.max(0.0, 1.0 - (_dragDistance.abs() * 0.002));
-    
-    // Vertical animation effects
-    final verticalOffset = _isVerticalDragging ? _verticalDragDistance * 0.8 : 0.0;
-    final verticalOpacity = math.max(0.3, 1.0 - (_verticalDragDistance.abs() * 0.001));
-    final verticalScale = math.max(0.85, 1.0 - (_verticalDragDistance.abs() * 0.0003));
-    final verticalRotation = _verticalDragDistance * 0.0005;
-
-    return AnimatedBuilder(
-      animation: Listenable.merge([_animation, _verticalAnimation]),
-      builder: (context, child) {
-        // Determine which animation to use based on gesture type
-        final isVerticalGesture = _verticalDragDistance.abs() > _dragDistance.abs();
-        
-        if (isVerticalGesture) {
-          // Vertical swipe animation
-          return Transform.translate(
-            offset: Offset(0, verticalOffset + (_verticalAnimation.value * -MediaQuery.of(context).size.height * 1.2)),
-            child: Transform.scale(
-              scale: verticalScale * (1.0 - _verticalAnimation.value * 0.3),
-              child: Transform.rotate(
-                angle: verticalRotation + (_verticalAnimation.value * verticalRotation * 2),
-                child: Opacity(
-                  opacity: verticalOpacity * (1.0 - _verticalAnimation.value),
-                  child: _buildCard(currentImage),
-                ),
-              ),
-            ),
-          );
-        } else {
-          // Horizontal swipe animation
-          return Transform.translate(
-            offset: Offset(_dragDistance, 0),
-            child: Transform.rotate(
-              angle: rotation,
-              child: Opacity(opacity: opacity, child: _buildCard(currentImage)),
-            ),
-          );
-        }
-      },
-    );
+  // Prefetch adjacent images for smoother page transitions
+  void _prefetchAdjacent(int index) {
+    final ctx = context;
+    // Next image
+    if (index + 1 < widget.imageContents.length) {
+      final nextUrl = _sanitizeUrlLocal(widget.imageContents[index + 1].fileUrl ?? '');
+      if (nextUrl.isNotEmpty) {
+        final provider = CachedNetworkImageProvider(nextUrl);
+        precacheImage(provider, ctx);
+      }
+    }
+    // Previous image
+    if (index - 1 >= 0) {
+      final prevUrl = _sanitizeUrlLocal(widget.imageContents[index - 1].fileUrl ?? '');
+      if (prevUrl.isNotEmpty) {
+        final provider = CachedNetworkImageProvider(prevUrl);
+        precacheImage(provider, ctx);
+      }
+    }
   }
 
   Widget _buildCard(
@@ -2504,10 +2411,10 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
       margin: EdgeInsets.only(top: 40.h, bottom: 80.h, left: 24.w, right: 24.w),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(40.r),
-  color: isBackground ? Colors.white.withValues(alpha: 0.1) : Colors.white,
+        color: isBackground ? Colors.white.withValues(alpha: 0.1) : Colors.white,
         border:
             isBackground
-  ? Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2.0)
+                ? Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2.0)
                 : null,
         boxShadow: [
           BoxShadow(
@@ -2528,39 +2435,30 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
         child: Stack(
           children: [
             // Image
-            Image.network(
-              image.fileUrl ?? '',
+            CachedNetworkImage(
+              imageUrl: _sanitizeUrlLocal(image.fileUrl ?? ''),
               width: double.infinity,
               height: double.infinity,
               fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Container(
-                  color: Colors.grey[300],
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      value:
-                          loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                      color: Colors.grey[600],
-                    ),
+              fadeInDuration: const Duration(milliseconds: 200),
+              placeholder: (context, url) => Container(
+                color: Colors.grey[300],
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.grey[600],
                   ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return Container(
-                  color: Colors.grey[300],
-                  child: const Center(
-                    child: Icon(
-                      Icons.image_not_supported,
-                      size: 100,
-                      color: Colors.grey,
-                    ),
+                ),
+              ),
+              errorWidget: (context, url, error) => Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Icon(
+                    Icons.image_not_supported,
+                    size: 100,
+                    color: Colors.grey,
                   ),
-                );
-              },
+                ),
+              ),
             ),
 
 
@@ -2627,42 +2525,6 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
       ),
     );
   }
-
-  void _nextImage() {
-    setState(() {
-      _currentIndex = (_currentIndex + 1) % widget.imageContents.length;
-    });
-  }
-
-  void _previousImage() {
-    setState(() {
-      _currentIndex =
-          _currentIndex == 0
-              ? widget.imageContents.length - 1
-              : _currentIndex - 1;
-    });
-  }
-
-  void _nextImageVertical() {
-    _verticalAnimationController.forward().then((_) {
-      setState(() {
-        _currentIndex = (_currentIndex + 1) % widget.imageContents.length;
-      });
-      _verticalAnimationController.reset();
-    });
-  }
-
-  void _previousImageVertical() {
-    _verticalAnimationController.forward().then((_) {
-      setState(() {
-        _currentIndex =
-            _currentIndex == 0
-                ? widget.imageContents.length - 1
-                : _currentIndex - 1;
-      });
-      _verticalAnimationController.reset();
-    });
-  }
 }
 
 // Fullscreen PDF Viewer Widget
@@ -2697,14 +2559,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
 
   void _openInNewTab(String url) {
     final u = _sanitizeUrl(url);
-    if (kIsWeb) {
-      try {
-        html.window.open(u, '_blank');
-      } catch (e) {
-        // Fallback: try setting location
-        html.window.location.href = u;
-      }
-    }
+    UrlLauncherService.openUrl(u);
   }
 
   @override

@@ -43,16 +43,8 @@ class PdfCubit extends Cubit<PdfState> {
 
     // Sample PDF - using a reliable PDF URL
     const pdf = PdfModel(
-      id: '1',
-      title: 'Introduction to Islamic Studies',
       pdfUrl:
           'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-      thumbnailUrl:
-          'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=300&h=400&fit=crop',
-      description:
-          'A comprehensive guide to Islamic studies covering fundamental concepts, history, and practices.',
-      totalPages: 25,
-      author: 'Dr. Ahmed Hassan',
     );
 
     emit(PdfLoaded(pdf: pdf));

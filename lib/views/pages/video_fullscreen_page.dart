@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'dart:io';
 import 'package:video_player/video_player.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +11,7 @@ import '../../data/models/video_model.dart';
 import '../../constants/app_colors.dart';
 import '../../router/app_router.dart';
 import '../../utils/fullscreen_util_stub.dart' if (dart.library.html) '../../utils/fullscreen_util_web.dart';
+import '../../services/video_cache_service.dart';
 
 class VideoFullscreenPage extends StatefulWidget {
   final VideoModel video;
@@ -44,6 +46,34 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
   void _initializeVideo() async {
     try {
       final sanitizedUrl = _sanitizeUrl(widget.video.videoUrl);
+      // Prefer cached file on mobile/desktop
+      if (!kIsWeb) {
+        await VideoCacheService.initialize();
+        final cachedPath = await VideoCacheService.getCachedFilePath(sanitizedUrl);
+        if (cachedPath != null) {
+          _formatLabel = _detectFormat(sanitizedUrl, _contentType);
+          _controller = VideoPlayerController.file(File(cachedPath));
+
+          await _controller.initialize();
+          await _controller.setVolume(_volume);
+          await _controller.setPlaybackSpeed(_playbackSpeed);
+          setState(() {
+            _isLoading = false;
+          });
+
+          _controller.addListener(() {
+            if (_controller.value.position >= _controller.value.duration) {
+              setState(() {
+                _isPlaying = false;
+              });
+              _controller.pause();
+            }
+          });
+
+          // Done: play from cache
+          return;
+        }
+      }
       // Best-effort fetch of content-type for labeling (may fail due to CORS on web)
       try {
         await _isVideoUrlAccessible(sanitizedUrl);
@@ -66,6 +96,11 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
           _controller.pause();
         }
       });
+
+      // Best-effort background prefetch to disk cache for future plays
+      if (!kIsWeb) {
+        VideoCacheService.cacheVideo(sanitizedUrl).catchError((_) {});
+      }
     } catch (e) {
       debugPrint('Error initializing video: $e');
       // Final fallback: sample URL to keep UX working

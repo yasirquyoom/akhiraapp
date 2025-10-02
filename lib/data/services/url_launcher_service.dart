@@ -8,17 +8,31 @@ class UrlLauncherService {
 
   /// Opens Instagram profile
   static Future<void> openInstagram() async {
-    await _launchUrl(_instagramUrl);
+    await openUrl(_instagramUrl);
   }
 
   /// Opens Facebook page
   static Future<void> openFacebook() async {
-    await _launchUrl(_facebookUrl);
+    await openUrl(_facebookUrl);
   }
 
   /// Opens contact page
   static Future<void> openContactPage() async {
-    await _launchUrl(_contactUrl);
+    await openUrl(_contactUrl);
+  }
+
+  /// Public generic method to launch any URL
+  static Future<void> openUrl(String url, {LaunchMode mode = LaunchMode.externalApplication}) async {
+    try {
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: mode);
+      } else {
+        throw Exception('Could not launch $url');
+      }
+    } catch (e) {
+      throw Exception('Failed to open URL: $e');
+    }
   }
 
   /// Generic method to launch any URL

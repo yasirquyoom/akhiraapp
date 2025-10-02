@@ -187,10 +187,13 @@ class QuizError extends QuizState {
 // Cubit
 class QuizCubit extends Cubit<QuizState> {
   final QuizRepository _repository;
+  String? _currentBookId; // track current book for score refreshes
 
   QuizCubit(this._repository) : super(QuizInitial());
 
   Future<void> loadQuizzesFromApi({required String bookId}) async {
+    // Remember current book id to enable score refreshes after submit
+    _currentBookId = bookId;
     emit(QuizLoading());
 
     try {
@@ -315,6 +318,10 @@ class QuizCubit extends Cubit<QuizState> {
         answers: optimisticAnswers,
         selectedOptionId: null,
         score: optimisticAnswers.where((a) => a.isCorrect).length,
+        // Optimistically update marks and attempts for immediate UI feedback
+        marksEarned: currentState.marksEarned + (isCorrect ? 1 : 0),
+        totalAttempted: currentState.totalAttempted + 1,
+        // Keep percentage/remainingQuestions driven by server to avoid mismatch
         isSubmitting: true,
       ),
     );
@@ -336,12 +343,102 @@ class QuizCubit extends Cubit<QuizState> {
         .catchError((_) => null);
   }
 
+  // Atomic: submit and advance to next question in one action
+  void submitAndAdvance({required String bookId}) {
+    if (state is! QuizLoaded) return;
+    final currentState = state as QuizLoaded;
+    final selected = currentState.selectedOptionId;
+    if (selected == null) return;
+
+    // Show submitting loader
+    emit(currentState.copyWith(isSubmitting: true));
+
+    // Optimistic update
+    final isCorrect = selected == currentState.currentQuestion.correctAnswerId;
+    final optimisticAnswer = QuizAnswer(
+      questionId: currentState.currentQuestion.id,
+      selectedOptionId: selected,
+      isCorrect: isCorrect,
+      answeredAt: DateTime.now(),
+    );
+    final optimisticAnswers = [...currentState.answers, optimisticAnswer];
+    emit(
+      currentState.copyWith(
+        answers: optimisticAnswers,
+        selectedOptionId: null,
+        score: optimisticAnswers.where((a) => a.isCorrect).length,
+        // Optimistically update marks and attempts for immediate UI feedback
+        marksEarned: currentState.marksEarned + (isCorrect ? 1 : 0),
+        totalAttempted: currentState.totalAttempted + 1,
+        // Keep percentage/remainingQuestions driven by server to avoid mismatch
+        isSubmitting: true,
+      ),
+    );
+
+    // Fire API and score refresh, then advance
+    _repository
+        .submitAnswer(
+          quizId: currentState.currentQuestion.id,
+          userAnswer: selected,
+        )
+        .then((_) => refreshBookScore(bookId))
+        .whenComplete(() {
+          // Advance question index if possible
+          final s = state;
+          if (s is QuizLoaded) {
+            if (!s.isLastQuestion) {
+              final nextQuestionIndex = s.currentQuestionIndex + 1;
+              final nextQuestion = s.questions[nextQuestionIndex];
+              final existingAnswer = s.answers
+                  .where((a) => a.questionId == nextQuestion.id)
+                  .firstOrNull;
+              emit(
+                s.copyWith(
+                  currentQuestionIndex: nextQuestionIndex,
+                  selectedOptionId: existingAnswer?.selectedOptionId,
+                  isSubmitting: false,
+                ),
+              );
+            } else {
+              // Last question: just stop submitting; UI will show score card
+              emit(s.copyWith(isSubmitting: false));
+            }
+          }
+        })
+        .catchError((_) {
+          final s = state;
+          if (s is QuizLoaded) {
+            emit(s.copyWith(isSubmitting: false));
+          }
+        });
+  }
+
   Future<void> _refreshScore() async {
     if (state is! QuizLoaded) return;
+    final bookId = _currentBookId;
+    if (bookId == null || bookId.isEmpty) return;
     try {
-      // Infer book id from questions payload? Not available here; handled by UI passing cubit action can be extended.
-      // For now, do nothing if not available.
-    } catch (_) {}
+      final resp = await _repository.getScore(bookId: bookId);
+      final data = resp.data['data'];
+      final currentState = state as QuizLoaded;
+      emit(
+        currentState.copyWith(
+          totalAttempted:
+              data['questions_attempted'] ?? currentState.totalAttempted,
+          totalPossibleMarks:
+              data['total_possible_marks'] ?? currentState.totalPossibleMarks,
+          marksEarned: data['marks_earned'] ?? currentState.marksEarned,
+          percentage:
+              (data['percentage'] ?? currentState.percentage).toDouble(),
+          remainingQuestions:
+              data['remaining_questions'] ?? currentState.remainingQuestions,
+          totalQuestionsFromApi:
+              data['total_questions'] ?? currentState.totalQuestionsFromApi,
+        ),
+      );
+    } catch (_) {
+      // ignore
+    }
   }
 
   Future<void> refreshBookScore(String bookId) async {
@@ -372,6 +469,8 @@ class QuizCubit extends Cubit<QuizState> {
 
   Future<void> resetBookAnswers(String bookId) async {
     try {
+      // Remember current book id
+      _currentBookId = bookId;
       // Show resetting loader
       if (state is QuizLoaded) {
         emit((state as QuizLoaded).copyWith(isResetting: true));

@@ -6,6 +6,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
+import 'package:akhira/services/audio_cache_service.dart';
 
 class AudioTrack {
   final String id;
@@ -209,7 +210,10 @@ class AudioCubit extends Cubit<AudioState> {
           title: content.title ?? content['title'] ?? 'Unknown Track',
           duration: '0:00', // Duration will be updated when audio loads
           audioUrl: content.fileUrl ?? content['file_url'] ?? '',
-          thumbnailUrl: '', // BookContent doesn't have thumbnailUrl field
+          // Use coverImageUrl if present in BookContent/API for dynamic artwork
+          thumbnailUrl:
+              (content.coverImageUrl ?? content['cover_image_url'] ?? '')
+                  .toString(),
         );
         tracks.add(track);
       }
@@ -275,20 +279,6 @@ class AudioCubit extends Cubit<AudioState> {
       final String sanitizedUrl = _sanitizeUrl(track.audioUrl);
       final String inferredMimeType = _inferMimeTypeFromUrl(sanitizedUrl);
 
-      // Test URL accessibility first
-      debugPrint('Testing URL accessibility...');
-      final isAccessible = await _testUrlAccessibility(sanitizedUrl);
-      if (!isAccessible) {
-        emit(
-          AudioError(
-            message:
-                'Audio file is not accessible. Please check your internet connection.',
-          ),
-        );
-        return;
-      }
-      debugPrint('URL is accessible, proceeding with playback...');
-
       // Stop current audio if playing
       await _audioPlayer.stop();
       debugPrint('Stopped current audio');
@@ -315,6 +305,36 @@ class AudioCubit extends Cubit<AudioState> {
         );
       }
       debugPrint('Updated state');
+
+      // Prefer cached file when available (mobile/desktop)
+      if (!kIsWeb) {
+        await AudioCacheService.initialize();
+        final cachedPath = await AudioCacheService.getCachedFilePath(sanitizedUrl);
+        if (cachedPath != null) {
+          debugPrint('Playing cached audio file: $cachedPath');
+          await _audioPlayer
+              .play(DeviceFileSource(cachedPath))
+              .timeout(
+                const Duration(seconds: 45),
+                onTimeout: () {
+                  debugPrint('Cached local play timeout');
+                  throw TimeoutException(
+                    'Cached local play timeout',
+                    const Duration(seconds: 45),
+                  );
+                },
+              );
+          debugPrint('Started playing audio (cached local)');
+          _startPositionTicker();
+          await _refreshDurationFromPlayer();
+          if (state is AudioLoaded) {
+            final s = state as AudioLoaded;
+            emit(s.copyWith(isPlaying: true));
+          }
+          _isStartingPlayback = false;
+          return;
+        }
+      }
 
       // Prefer local fallback on iOS for WAV to avoid AVPlayer stalls
       if (Platform.isIOS && sanitizedUrl.toLowerCase().endsWith('.wav')) {
@@ -346,6 +366,20 @@ class AudioCubit extends Cubit<AudioState> {
         return;
       }
 
+      // Test URL accessibility first (when not cached)
+      debugPrint('Testing URL accessibility...');
+      final isAccessible = await _testUrlAccessibility(sanitizedUrl);
+      if (!isAccessible) {
+        emit(
+          AudioError(
+            message:
+                'Audio file is not accessible. Please check your internet connection.',
+          ),
+        );
+        return;
+      }
+      debugPrint('URL is accessible, proceeding with playback...');
+
       // Stream first for other types
       debugPrint('Playing audio directly: $sanitizedUrl (mime: $inferredMimeType)');
       await _audioPlayer
@@ -366,6 +400,10 @@ class AudioCubit extends Cubit<AudioState> {
       if (state is AudioLoaded) {
         final s = state as AudioLoaded;
         emit(s.copyWith(isPlaying: true));
+      }
+      // Background prefetch to disk cache (best-effort)
+      if (!kIsWeb) {
+        AudioCacheService.cacheAudio(sanitizedUrl).catchError((_) {});
       }
       _isStartingPlayback = false;
       return;

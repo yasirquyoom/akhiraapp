@@ -189,10 +189,35 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20.r),
-                      child: Image.network(
-                        'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSbOWfIYTEzWQ4i2ryypJlyIQQ2G_GPTpr0pQ&usqp=CAU',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
+                      child: Builder(
+                        builder: (_) {
+                          final artUrl = state.currentTrack?.thumbnailUrl ?? '';
+                          if (artUrl.isNotEmpty) {
+                            return Image.network(
+                              _sanitizeUrl(artUrl),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        AppColors.primary,
+                                        AppColors.primaryGradientEnd,
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(20.r),
+                                  ),
+                                  child: const Icon(
+                                    Icons.music_note,
+                                    color: Colors.white,
+                                    size: 80,
+                                  ),
+                                );
+                              },
+                            );
+                          }
                           return Container(
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
@@ -523,5 +548,22 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';
+  }
+
+  String _sanitizeUrl(String url) {
+    String trimmed = url.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      trimmed = trimmed.substring(1, trimmed.length - 1);
+    }
+    if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+      trimmed = trimmed.substring(1, trimmed.length - 1);
+    }
+    if (trimmed.startsWith('`') && trimmed.endsWith('`')) {
+      trimmed = trimmed.substring(1, trimmed.length - 1);
+    }
+    if (trimmed.endsWith('?')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    return trimmed;
   }
 }
