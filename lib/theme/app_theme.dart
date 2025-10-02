@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
@@ -86,7 +87,7 @@ class AppTheme {
     );
   }
 
-  static InputDecorationThemeData _inputTheme(InputDecorationThemeData base) {
+  static InputDecorationTheme _inputTheme(InputDecorationTheme base) {
     return base.copyWith(
       filled: true,
       fillColor: Colors.grey.shade50,

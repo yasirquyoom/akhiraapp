@@ -49,10 +49,10 @@ class Quiz {
   final String quizId;
   final String bookId;
   final String question;
-  final String option1;
-  final String option2;
-  final String option3;
-  final String option4;
+  final String? option1;
+  final String? option2;
+  final String? option3;
+  final String? option4;
   final String correctOption;
   final int marks;
   final int quizNumber;
@@ -63,10 +63,10 @@ class Quiz {
     required this.quizId,
     required this.bookId,
     required this.question,
-    required this.option1,
-    required this.option2,
-    required this.option3,
-    required this.option4,
+    this.option1,
+    this.option2,
+    this.option3,
+    this.option4,
     required this.correctOption,
     required this.marks,
     required this.quizNumber,
@@ -79,10 +79,10 @@ class Quiz {
       quizId: json['quiz_id'] as String,
       bookId: json['book_id'] as String,
       question: json['question'] as String,
-      option1: json['option1'] as String,
-      option2: json['option2'] as String,
-      option3: json['option3'] as String,
-      option4: json['option4'] as String,
+      option1: json['option1'] as String?,
+      option2: json['option2'] as String?,
+      option3: json['option3'] as String?,
+      option4: json['option4'] as String?,
       correctOption: json['correct_option'] as String,
       marks: json['marks'] as int,
       quizNumber: json['quiz_number'] as int,

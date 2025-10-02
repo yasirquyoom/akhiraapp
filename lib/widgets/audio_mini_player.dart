@@ -32,28 +32,28 @@ class AudioMiniPlayer extends StatelessWidget {
           bottom: true,
           child: Container(
             margin: const EdgeInsets.all(12),
-            height: 72,
+            height: 160,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF2E4FB6), Color(0xFF142350)],
+                colors: [Color(0xFF8B1538), Color(0xFF5D0E26)],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 15,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
             child: Material(
               color: Colors.transparent,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(20),
                 onTap: () {
                   final router = getIt<AppRouter>().router;
                   final path = router.routeInformationProvider.value.uri.path;
@@ -61,114 +61,235 @@ class AudioMiniPlayer extends StatelessWidget {
                     router.push(AppRoutes.audioFullscreen);
                   }
                 },
-                child: Row(
+                child: Stack(
                   children: [
-                    // Thumbnail
-                    Container(
-                      width: 56,
-                      height: 56,
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child:
-                            (audioState.currentTrack?.thumbnailUrl.isNotEmpty ==
-                                    true)
-                                ? Image.network(
-                                  _sanitizeUrl(
-                                    audioState.currentTrack!.thumbnailUrl,
-                                  ),
-                                  fit: BoxFit.cover,
-                                  errorBuilder:
-                                      (_, __, ___) => Container(
-                                        color: Colors.white.withOpacity(0.2),
-                                        child: const Icon(
-                                          Icons.audiotrack,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                )
-                                : Container(
-                                  color: Colors.white.withOpacity(0.2),
-                                  child: const Icon(
-                                    Icons.audiotrack,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                    // Background decorative pattern
+                    Positioned.fill(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF8B1538), Color(0xFF5D0E26)],
+                          ),
+                        ),
+                        child: CustomPaint(
+                          painter: IslamicPatternPainter(),
+                        ),
                       ),
                     ),
-
-                    // Title & duration
-                    Expanded(
+                    
+                    // Main content
+                    Padding(
+                      padding: const EdgeInsets.all(16),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            audioState.currentTrack?.title ?? 'Title',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: Colors.white,
+                          // Top section with crescent and title
+                          Row(
+                            children: [
+                              // Crescent moon
+                              Container(
+                                width: 24,
+                                height: 24,
+                                child: CustomPaint(
+                                  painter: CrescentPainter(),
+                                ),
+                              ),
+                              const Spacer(),
+                              // Title
+                              Text(
+                                audioState.currentTrack?.title ?? 'Le titre ira ici',
+                                style: const TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const Spacer(),
+                              // Share icon
+                              const Icon(
+                                Icons.share,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 8),
+                          
+                          // Central illustration area
+                          Expanded(
+                            child: Row(
+                              children: [
+                                // Left decorative area
+                                Expanded(
+                                  flex: 1,
+                                  child: Container(),
+                                ),
+                                
+                                // Central book
+                                Container(
+                                  width: 60,
+                                  height: 50,
+                                  child: CustomPaint(
+                                    painter: BookPainter(),
+                                  ),
+                                ),
+                                
+                                // Right side with candle
+                                Expanded(
+                                  flex: 1,
+                                  child: Align(
+                                    alignment: Alignment.centerRight,
+                                    child: Container(
+                                      width: 20,
+                                      height: 40,
+                                      child: CustomPaint(
+                                        painter: CandlePainter(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${_formatTime(audioState.currentPosition)} / ${_formatTime(audioState.totalDuration)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
-                              color: Colors.white70,
-                            ),
+                          
+                          const SizedBox(height: 8),
+                          
+                          // Progress bar
+                          Column(
+                            children: [
+                              // Time display
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _formatTime(audioState.currentPosition),
+                                    style: const TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontSize: 12,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatTime(audioState.totalDuration),
+                                    style: const TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontSize: 12,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              
+                              const SizedBox(height: 4),
+                              
+                              // Progress bar
+                              Container(
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(2),
+                                  color: Colors.white.withOpacity(0.3),
+                                ),
+                                child: FractionallySizedBox(
+                                  alignment: Alignment.centerLeft,
+                                  widthFactor: audioState.totalDuration.inMilliseconds > 0
+                                      ? audioState.currentPosition.inMilliseconds / audioState.totalDuration.inMilliseconds
+                                      : 0.0,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(2),
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 8),
+                          
+                          // Media controls
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Repeat/shuffle
+                              IconButton(
+                                onPressed: () {},
+                                icon: const Icon(
+                                  Icons.repeat,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                              ),
+                              
+                              const SizedBox(width: 8),
+                              
+                              // Previous
+                              IconButton(
+                                onPressed: () => context.read<AudioCubit>().previousTrack(),
+                                icon: const Icon(
+                                  Icons.skip_previous,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              
+                              const SizedBox(width: 8),
+                              
+                              // Play/Pause
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: IconButton(
+                                  onPressed: () {
+                                    if (audioState.isPlaying) {
+                                      context.read<AudioCubit>().pauseTrack();
+                                    } else {
+                                      context.read<AudioCubit>().resumeTrack();
+                                    }
+                                  },
+                                  icon: Icon(
+                                    audioState.isPlaying ? Icons.pause : Icons.play_arrow,
+                                    color: const Color(0xFF8B1538),
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                              
+                              const SizedBox(width: 8),
+                              
+                              // Next
+                              IconButton(
+                                onPressed: () => context.read<AudioCubit>().nextTrack(),
+                                icon: const Icon(
+                                  Icons.skip_next,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                              
+                              const SizedBox(width: 8),
+                              
+                              // Menu
+                              IconButton(
+                                onPressed: () {},
+                                icon: const Icon(
+                                  Icons.menu,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ),
-
-                    // Controls
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed:
-                              () => context.read<AudioCubit>().previousTrack(),
-                          icon: const Icon(
-                            Icons.skip_previous,
-                            color: Colors.white,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            if (audioState.isPlaying) {
-                              context.read<AudioCubit>().pauseTrack();
-                            } else {
-                              context.read<AudioCubit>().resumeTrack();
-                            }
-                          },
-                          icon: Icon(
-                            audioState.isPlaying
-                                ? Icons.pause
-                                : Icons.play_arrow,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed:
-                              () => context.read<AudioCubit>().nextTrack(),
-                          icon: const Icon(
-                            Icons.skip_next,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -194,4 +315,182 @@ class AudioMiniPlayer extends StatelessWidget {
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return '$minutes:$seconds';
   }
+}
+
+// Custom painter for Islamic decorative pattern
+class IslamicPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.1)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    // Draw subtle geometric patterns
+    final path = Path();
+    
+    // Create a subtle geometric pattern
+    for (int i = 0; i < size.width; i += 30) {
+      for (int j = 0; j < size.height; j += 30) {
+        path.addOval(Rect.fromCircle(
+          center: Offset(i.toDouble(), j.toDouble()),
+          radius: 3,
+        ));
+      }
+    }
+    
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
+// Custom painter for crescent moon
+class CrescentPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFFFD700) // Gold color
+      ..style = PaintingStyle.fill;
+
+    final path = Path();
+    
+    // Create crescent shape
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 3;
+    
+    // Outer circle
+    path.addOval(Rect.fromCircle(center: center, radius: radius));
+    
+    // Inner circle to create crescent
+    final innerCenter = Offset(center.dx + radius * 0.3, center.dy);
+    path.addOval(Rect.fromCircle(center: innerCenter, radius: radius * 0.8));
+    
+    path.fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
+// Custom painter for open book
+class BookPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bookPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+      
+    final shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.2)
+      ..style = PaintingStyle.fill;
+      
+    final linePaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..strokeWidth = 0.5
+      ..style = PaintingStyle.stroke;
+
+    // Book shadow
+    final shadowPath = Path();
+    shadowPath.moveTo(size.width * 0.1 + 2, size.height * 0.3 + 2);
+    shadowPath.lineTo(size.width * 0.9 + 2, size.height * 0.3 + 2);
+    shadowPath.lineTo(size.width * 0.9 + 2, size.height * 0.9 + 2);
+    shadowPath.lineTo(size.width * 0.5 + 2, size.height * 0.8 + 2);
+    shadowPath.lineTo(size.width * 0.1 + 2, size.height * 0.9 + 2);
+    shadowPath.close();
+    canvas.drawPath(shadowPath, shadowPaint);
+
+    // Book pages
+    final bookPath = Path();
+    bookPath.moveTo(size.width * 0.1, size.height * 0.3);
+    bookPath.lineTo(size.width * 0.9, size.height * 0.3);
+    bookPath.lineTo(size.width * 0.9, size.height * 0.9);
+    bookPath.lineTo(size.width * 0.5, size.height * 0.8);
+    bookPath.lineTo(size.width * 0.1, size.height * 0.9);
+    bookPath.close();
+    canvas.drawPath(bookPath, bookPaint);
+
+    // Book spine
+    canvas.drawLine(
+      Offset(size.width * 0.5, size.height * 0.3),
+      Offset(size.width * 0.5, size.height * 0.8),
+      linePaint,
+    );
+
+    // Text lines on pages
+    for (int i = 0; i < 4; i++) {
+      final y = size.height * 0.4 + (i * size.height * 0.08);
+      // Left page lines
+      canvas.drawLine(
+        Offset(size.width * 0.15, y),
+        Offset(size.width * 0.45, y),
+        linePaint,
+      );
+      // Right page lines
+      canvas.drawLine(
+        Offset(size.width * 0.55, y),
+        Offset(size.width * 0.85, y),
+        linePaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
+}
+
+// Custom painter for candle
+class CandlePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final candlePaint = Paint()
+      ..color = const Color(0xFFF5E6D3) // Cream color
+      ..style = PaintingStyle.fill;
+      
+    final flamePaint = Paint()
+      ..color = const Color(0xFFFF6B35) // Orange flame
+      ..style = PaintingStyle.fill;
+      
+    final wickPaint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    // Candle body
+    final candleRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width * 0.3,
+        size.height * 0.3,
+        size.width * 0.4,
+        size.height * 0.6,
+      ),
+      const Radius.circular(2),
+    );
+    canvas.drawRRect(candleRect, candlePaint);
+
+    // Wick
+    canvas.drawLine(
+      Offset(size.width * 0.5, size.height * 0.3),
+      Offset(size.width * 0.5, size.height * 0.2),
+      wickPaint,
+    );
+
+    // Flame
+    final flamePath = Path();
+    flamePath.moveTo(size.width * 0.5, size.height * 0.2);
+    flamePath.quadraticBezierTo(
+      size.width * 0.6, size.height * 0.15,
+      size.width * 0.5, size.height * 0.1,
+    );
+    flamePath.quadraticBezierTo(
+      size.width * 0.4, size.height * 0.15,
+      size.width * 0.5, size.height * 0.2,
+    );
+    canvas.drawPath(flamePath, flamePaint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

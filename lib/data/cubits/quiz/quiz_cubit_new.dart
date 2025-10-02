@@ -256,17 +256,25 @@ class QuizCubit extends Cubit<QuizState> {
   List<QuizOption> _parseQuizOptions(Quiz quiz) {
     final options = <QuizOption>[];
 
-    // Add option1
-    options.add(QuizOption(id: 'option1', text: quiz.option1, letter: 'A'));
+    // Add option1 if it has meaningful content
+    if (quiz.option1 != null && quiz.option1!.trim().isNotEmpty) {
+      options.add(QuizOption(id: 'option1', text: quiz.option1!, letter: 'A'));
+    }
 
-    // Add option2
-    options.add(QuizOption(id: 'option2', text: quiz.option2, letter: 'B'));
+    // Add option2 if it has meaningful content
+    if (quiz.option2 != null && quiz.option2!.trim().isNotEmpty) {
+      options.add(QuizOption(id: 'option2', text: quiz.option2!, letter: 'B'));
+    }
 
-    // Add option3
-    options.add(QuizOption(id: 'option3', text: quiz.option3, letter: 'C'));
+    // Add option3 if it has meaningful content
+    if (quiz.option3 != null && quiz.option3!.trim().isNotEmpty) {
+      options.add(QuizOption(id: 'option3', text: quiz.option3!, letter: 'C'));
+    }
 
-    // Add option4
-    options.add(QuizOption(id: 'option4', text: quiz.option4, letter: 'D'));
+    // Add option4 if it has meaningful content
+    if (quiz.option4 != null && quiz.option4!.trim().isNotEmpty) {
+      options.add(QuizOption(id: 'option4', text: quiz.option4!, letter: 'D'));
+    }
 
     return options;
   }

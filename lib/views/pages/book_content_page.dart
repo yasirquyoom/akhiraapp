@@ -20,6 +20,7 @@ import '../../widgets/language_toggle.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:gal/gal.dart';
 import 'package:dio/dio.dart';
+import '../../services/pdf_cache_service.dart';
 
 class BookContentPage extends StatefulWidget {
   final int initialTabIndex;
@@ -38,6 +39,12 @@ class _BookContentPageState extends State<BookContentPage>
   int _currentTabIndex = 0;
   late PdfViewerController _pdfViewerController;
   double _currentZoomLevel = 1.0;
+  
+  // PDF caching variables
+  bool _isPdfCaching = false;
+  double _cachingProgress = 0.0;
+  String? _cachedPdfPath;
+  bool _isPdfCached = false;
 
   @override
   void initState() {
@@ -55,6 +62,9 @@ class _BookContentPageState extends State<BookContentPage>
 
     // Load all book content initially
     _loadAllBookContent();
+    
+    // Initialize PDF cache
+    _initializePdfCache();
   }
 
   @override
@@ -96,6 +106,147 @@ class _BookContentPageState extends State<BookContentPage>
 
   String _getZoomPercentage() {
     return '${(_currentZoomLevel * 100).round()}%';
+  }
+
+  // PDF Caching Methods
+  Future<void> _initializePdfCache() async {
+    await PdfCacheService.initialize();
+  }
+
+  Future<void> _checkPdfCache(String pdfUrl) async {
+    if (pdfUrl.isEmpty) return;
+    
+    setState(() {
+      _isPdfCaching = true;
+      _cachingProgress = 0.0;
+    });
+
+    try {
+      // Check if PDF is already cached
+      final isCached = await PdfCacheService.isCached(pdfUrl);
+      
+      if (isCached) {
+        final cachedPath = await PdfCacheService.getCachedFilePath(pdfUrl);
+        setState(() {
+          _cachedPdfPath = cachedPath;
+          _isPdfCached = true;
+          _isPdfCaching = false;
+          _cachingProgress = 1.0;
+        });
+      } else {
+        // Cache the PDF
+        await _cachePdf(pdfUrl);
+      }
+    } catch (e) {
+      setState(() {
+        _isPdfCaching = false;
+        _cachingProgress = 0.0;
+      });
+      print('Error checking PDF cache: $e');
+    }
+  }
+
+  Future<void> _cachePdf(String pdfUrl) async {
+    try {
+      final cachedPath = await PdfCacheService.cachePdf(
+        pdfUrl,
+        onProgress: (progress) {
+          setState(() {
+            _cachingProgress = progress;
+          });
+        },
+      );
+
+      if (cachedPath != null) {
+        setState(() {
+          _cachedPdfPath = cachedPath;
+          _isPdfCached = true;
+          _isPdfCaching = false;
+          _cachingProgress = 1.0;
+        });
+      } else {
+        setState(() {
+          _isPdfCaching = false;
+          _cachingProgress = 0.0;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _isPdfCaching = false;
+        _cachingProgress = 0.0;
+      });
+      print('Error caching PDF: $e');
+    }
+  }
+
+  String _getPdfSource(String pdfUrl) {
+    if (_isPdfCached && _cachedPdfPath != null) {
+      return _cachedPdfPath!;
+    }
+    return pdfUrl;
+  }
+
+  Widget _buildPdfViewer(String pdfUrl) {
+    if (_isPdfCached && _cachedPdfPath != null) {
+      // Use cached file
+      return SfPdfViewer.file(
+        File(_cachedPdfPath!),
+        controller: _pdfViewerController,
+        canShowScrollHead: true,
+        canShowScrollStatus: true,
+        enableDoubleTapZooming: true,
+        enableTextSelection: true,
+        canShowPaginationDialog: true,
+        onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+          print('Cached PDF loaded: ${details.document.pages.count} pages');
+        },
+        onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+          print('Cached PDF load failed: ${details.error}');
+          // If cached file fails, try to reload from network
+          setState(() {
+            _isPdfCached = false;
+            _cachedPdfPath = null;
+          });
+          _checkPdfCache(pdfUrl);
+        },
+      );
+    } else {
+      // Use network source
+      return SfPdfViewer.network(
+        _sanitizeUrl(pdfUrl),
+        controller: _pdfViewerController,
+        canShowScrollHead: true,
+        canShowScrollStatus: true,
+        enableDoubleTapZooming: true,
+        enableTextSelection: true,
+        canShowPaginationDialog: true,
+        onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+          print('Network PDF loaded: ${details.document.pages.count} pages');
+        },
+        onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+          print('Network PDF load failed: ${details.error}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load PDF: ${details.description}'),
+              backgroundColor: Colors.red,
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () {
+                  setState(() {
+                    // Reset cache state and retry
+                    _isPdfCaching = false;
+                    _isPdfCached = false;
+                    _cachedPdfPath = null;
+                  });
+                  _checkPdfCache(pdfUrl);
+                },
+              ),
+            ),
+          );
+        },
+      );
+    }
   }
 
   void _onTabChanged() {
@@ -228,7 +379,7 @@ class _BookContentPageState extends State<BookContentPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Color(0xFFE8F4F0), // Light mint/sage green background
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -381,6 +532,8 @@ class _BookContentPageState extends State<BookContentPage>
     final bookCubit = context.read<BookCubit>();
     final bookId = bookCubit.getCurrentBookId();
 
+    print('DEBUG: Digital Book Tab - bookId: $bookId');
+
     if (bookId == null || bookId.isEmpty) {
       return Center(
         child: Column(
@@ -414,26 +567,56 @@ class _BookContentPageState extends State<BookContentPage>
 
     return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
+        print('DEBUG: Digital Book Tab - state: ${state.runtimeType}');
+        
         if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is BookContentLoaded) {
+          print('DEBUG: Digital Book Tab - loaded data: ${state.data.contents?.length} contents');
+          
           final ebookContents =
               state.data.contents
                   ?.where((content) => content.contentType == 'ebook')
                   .toList() ??
               [];
 
+          print('DEBUG: Digital Book Tab - ebook contents: ${ebookContents.length}');
+          
           if (ebookContents.isEmpty) {
-            return const SizedBox.shrink();
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.picture_as_pdf, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No PDF Content Available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    'This book doesn\'t have any PDF content',
+                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
 
           // Render PDF inline in this tab (first PDF)
           final ebook = ebookContents.first;
+          print('DEBUG: Digital Book Tab - rendering PDF: ${ebook.title}, URL: ${ebook.fileUrl}');
           return _buildInlinePdfViewer(
             title: ebook.title,
             pdfUrl: ebook.fileUrl,
           );
         } else if (state is BookContentError) {
+          print('DEBUG: Digital Book Tab - error: ${state.message}');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -474,99 +657,274 @@ class _BookContentPageState extends State<BookContentPage>
     required String title,
     required String pdfUrl,
   }) {
+    // Initialize caching when PDF URL is available
+    if (pdfUrl.isNotEmpty && !_isPdfCaching && !_isPdfCached) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkPdfCache(pdfUrl);
+      });
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Zoom controls bar
+        // Enhanced zoom controls bar with cache status
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
           decoration: BoxDecoration(
-            color: Colors.grey[50],
+            gradient: LinearGradient(
+              colors: [Colors.grey[50]!, Colors.white],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
             border: Border(
               bottom: BorderSide(color: Colors.grey[300]!, width: 1),
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             children: [
-              // Zoom level display
+              // Cache status indicator
+              if (_isPdfCaching || _isPdfCached)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                  decoration: BoxDecoration(
+                    color: _isPdfCached ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(
+                      color: _isPdfCached ? Colors.green.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isPdfCaching)
+                        SizedBox(
+                          width: 12.w,
+                          height: 12.h,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                            value: _cachingProgress,
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.offline_bolt,
+                          size: 12.sp,
+                          color: Colors.green,
+                        ),
+                      SizedBox(width: 4.w),
+                      Text(
+                        _isPdfCaching ? 'Caching...' : 'Cached',
+                        style: TextStyle(
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.w600,
+                          color: _isPdfCached ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
+              if (_isPdfCaching || _isPdfCached) SizedBox(width: 12.w),
+              
+              // Zoom level display with enhanced styling
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [AppColors.primary.withOpacity(0.1), Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.zoom_in,
+                      size: 14.sp,
+                      color: AppColors.primary,
+                    ),
+                    SizedBox(width: 4.w),
+                    Text(
+                      _getZoomPercentage(),
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 16.w),
+              
+              // Zoom controls with better styling
+              Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(20.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: Text(
-                  _getZoomPercentage(),
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Zoom out button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20.r),
+                        onTap: _currentZoomLevel > 0.5 ? _zoomOut : null,
+                        child: Container(
+                          padding: EdgeInsets.all(10.w),
+                          child: Icon(
+                            Icons.remove,
+                            color: _currentZoomLevel > 0.5 ? AppColors.primary : Colors.grey,
+                            size: 18.sp,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 20.h,
+                      color: Colors.grey[300],
+                    ),
+                    // Reset zoom button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20.r),
+                        onTap: _currentZoomLevel != 1.0 ? _resetZoom : null,
+                        child: Container(
+                          padding: EdgeInsets.all(10.w),
+                          child: Icon(
+                            Icons.refresh,
+                            color: _currentZoomLevel != 1.0 ? AppColors.primary : Colors.grey,
+                            size: 18.sp,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 20.h,
+                      color: Colors.grey[300],
+                    ),
+                    // Zoom in button
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20.r),
+                        onTap: _currentZoomLevel < 3.0 ? _zoomIn : null,
+                        child: Container(
+                          padding: EdgeInsets.all(10.w),
+                          child: Icon(
+                            Icons.add,
+                            color: _currentZoomLevel < 3.0 ? AppColors.primary : Colors.grey,
+                            size: 18.sp,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(width: 12.w),
-              // Zoom out button
-              IconButton(
-                icon: Icon(
-                  Icons.zoom_out,
-                  color: _currentZoomLevel > 0.5 ? Colors.black87 : Colors.grey,
-                  size: 20.sp,
-                ),
-                onPressed: _currentZoomLevel > 0.5 ? _zoomOut : null,
-                tooltip: 'Zoom Out',
-                padding: EdgeInsets.all(8.w),
-                constraints: BoxConstraints(minWidth: 40.w, minHeight: 40.h),
-              ),
-              // Reset zoom button
-              IconButton(
-                icon: Icon(
-                  Icons.refresh,
-                  color:
-                      _currentZoomLevel != 1.0 ? Colors.black87 : Colors.grey,
-                  size: 20.sp,
-                ),
-                onPressed: _currentZoomLevel != 1.0 ? _resetZoom : null,
-                tooltip: 'Reset Zoom',
-                padding: EdgeInsets.all(8.w),
-                constraints: BoxConstraints(minWidth: 40.w, minHeight: 40.h),
-              ),
-              // Zoom in button
-              IconButton(
-                icon: Icon(
-                  Icons.zoom_in,
-                  color: _currentZoomLevel < 3.0 ? Colors.black87 : Colors.grey,
-                  size: 20.sp,
-                ),
-                onPressed: _currentZoomLevel < 3.0 ? _zoomIn : null,
-                tooltip: 'Zoom In',
-                padding: EdgeInsets.all(8.w),
-                constraints: BoxConstraints(minWidth: 40.w, minHeight: 40.h),
-              ),
+              
               const Spacer(),
-              // PDF title
+              
+              // PDF title with better styling
               Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(8.r),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              
+              SizedBox(width: 16.w),
+              
+              // Fullscreen button
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20.r),
+                  onTap: () => _openFullscreenPdf(title, pdfUrl),
+                  child: Container(
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20.r),
+                    ),
+                    child: Icon(
+                      Icons.fullscreen,
+                      color: AppColors.primary,
+                      size: 20.sp,
+                    ),
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        // PDF viewer
+        
+        // Enhanced PDF viewer with gesture detection
         Expanded(
-          child: SfPdfViewer.network(
-            _sanitizeUrl(pdfUrl),
-            controller: _pdfViewerController,
-            canShowScrollHead: true,
-            canShowScrollStatus: true,
+          child: GestureDetector(
+            onScaleStart: (details) {
+              // Store initial zoom level for pinch-to-zoom
+            },
+            onScaleUpdate: (details) {
+              if (details.scale != 1.0) {
+                final newZoomLevel = (_currentZoomLevel * details.scale).clamp(0.5, 3.0);
+                if (newZoomLevel != _currentZoomLevel) {
+                  setState(() {
+                    _currentZoomLevel = newZoomLevel;
+                    _pdfViewerController.zoomLevel = _currentZoomLevel;
+                  });
+                }
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: _buildPdfViewer(pdfUrl),
+            ),
           ),
         ),
       ],
@@ -579,6 +937,19 @@ class _BookContentPageState extends State<BookContentPage>
       u = u.substring(0, u.length - 1);
     }
     return u;
+  }
+
+  void _openFullscreenPdf(String title, String pdfUrl) {
+    final effectivePdfUrl = _getPdfSource(pdfUrl);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _FullscreenPdfViewer(
+          title: title,
+          pdfUrl: effectivePdfUrl,
+          isFromCache: _isPdfCached,
+        ),
+      ),
+    );
   }
 
   String _formatDuration(Duration d) {
@@ -1456,6 +1827,8 @@ class _BookContentPageState extends State<BookContentPage>
     final bookCubit = context.read<BookCubit>();
     final bookId = bookCubit.getCurrentBookId();
 
+    print('DEBUG: Videos Tab - bookId: $bookId');
+
     if (bookId == null || bookId.isEmpty) {
       return Center(
         child: Column(
@@ -1489,22 +1862,51 @@ class _BookContentPageState extends State<BookContentPage>
 
     return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
+        print('DEBUG: Videos Tab - state: ${state.runtimeType}');
+        
         if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is BookContentLoaded) {
+          print('DEBUG: Videos Tab - loaded data: ${state.data.contents?.length} contents');
+          
           final videoContents =
               state.data.contents
                   ?.where((content) => content.contentType == 'video')
                   .toList() ??
               [];
 
+          print('DEBUG: Videos Tab - video contents: ${videoContents.length}');
+          
           if (videoContents.isEmpty) {
-            // Keep it blank to avoid flicker when swiping between tabs
-            return const SizedBox.shrink();
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.video_library, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No Video Content Available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    'This book doesn\'t have any video content',
+                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
 
+          print('DEBUG: Videos Tab - rendering video list with ${videoContents.length} videos');
           return _buildVideoList(videoContents);
         } else if (state is BookContentError) {
+          print('DEBUG: Videos Tab - error: ${state.message}');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1771,10 +2173,14 @@ class _ImageCardStackWidget extends StatefulWidget {
 class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     with TickerProviderStateMixin {
   late AnimationController _animationController;
+  late AnimationController _verticalAnimationController;
   late Animation<double> _animation;
+  late Animation<double> _verticalAnimation;
   int _currentIndex = 0;
   double _dragDistance = 0.0;
+  double _verticalDragDistance = 0.0;
   bool _isDragging = false;
+  bool _isVerticalDragging = false;
 
   String _sanitizeUrlLocal(String url) {
     var u = (url).trim();
@@ -1854,11 +2260,20 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
+    
+    _verticalAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _verticalAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _verticalAnimationController, curve: Curves.easeInOutCubic),
+    );
   }
 
   @override
   void dispose() {
     _animationController.dispose();
+    _verticalAnimationController.dispose();
     super.dispose();
   }
 
@@ -1867,34 +2282,55 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     return GestureDetector(
       onPanStart: (details) {
         _isDragging = true;
+        _isVerticalDragging = true;
       },
       onPanUpdate: (details) {
-        if (_isDragging) {
+        if (_isDragging || _isVerticalDragging) {
           setState(() {
             _dragDistance += details.delta.dx;
+            _verticalDragDistance += details.delta.dy;
           });
         }
       },
       onPanEnd: (details) {
         _isDragging = false;
+        _isVerticalDragging = false;
 
         // Determine swipe direction and velocity
-        final velocity = details.velocity.pixelsPerSecond.dx;
-        final dragThreshold = 100.0;
+        final horizontalVelocity = details.velocity.pixelsPerSecond.dx;
+        final verticalVelocity = details.velocity.pixelsPerSecond.dy;
+        final dragThreshold = 80.0;
+        final velocityThreshold = 400.0;
 
-        if (_dragDistance.abs() > dragThreshold || velocity.abs() > 500) {
-          if (_dragDistance > 0 || velocity > 0) {
-            // Swipe right - previous image
-            _previousImage();
-          } else {
-            // Swipe left - next image
-            _nextImage();
+        // Check if vertical gesture is more dominant
+        if (_verticalDragDistance.abs() > _dragDistance.abs() && _verticalDragDistance.abs() > 30.0) {
+          // Vertical swipe detected
+          if (_verticalDragDistance.abs() > dragThreshold || verticalVelocity.abs() > velocityThreshold) {
+            if (_verticalDragDistance < 0 || verticalVelocity < 0) {
+              // Swipe up - next image with vertical animation
+              _nextImageVertical();
+            } else {
+              // Swipe down - previous image with vertical animation
+              _previousImageVertical();
+            }
+          }
+        } else if (_dragDistance.abs() > 30.0) {
+          // Horizontal swipe detected
+          if (_dragDistance.abs() > dragThreshold || horizontalVelocity.abs() > velocityThreshold) {
+            if (_dragDistance > 0 || horizontalVelocity > 0) {
+              // Swipe right - previous image
+              _previousImage();
+            } else {
+              // Swipe left - next image
+              _nextImage();
+            }
           }
         }
 
-        // Reset drag distance
+        // Reset drag distances
         setState(() {
           _dragDistance = 0.0;
+          _verticalDragDistance = 0.0;
         });
       },
       child: SizedBox(
@@ -1915,12 +2351,17 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
 
   List<Widget> _buildBackgroundCards() {
     final cards = <Widget>[];
-    final maxBackgroundCards = math.min(3, widget.imageContents.length - 1);
+    final maxBackgroundCards = 2; // Only 2 background cards for cleaner look
+
+    // Define gradient colors for background cards
+    final gradientColors = [
+      [Color(0xFF6B73FF), Color(0xFF9B59B6)], // Purple-blue gradient
+      [Color(0xFF4A90E2), Color(0xFF7B68EE)], // Blue gradient
+    ];
 
     for (int i = 1; i <= maxBackgroundCards; i++) {
-      final cardIndex = (_currentIndex + i) % widget.imageContents.length;
-      final scale = 1.0 - (i * 0.02); // Each card is 2% smaller
-      final offset = i * 20.0; // Each card is offset by 20px
+      final scale = 1.0 - (i * 0.03); // Each card is 3% smaller
+      final offset = i * 12.0; // Reduced offset for tighter stacking
 
       cards.add(
         Positioned(
@@ -1930,10 +2371,24 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
           bottom: offset,
           child: Transform.scale(
             scale: scale,
-            child: _buildCard(
-              widget.imageContents[cardIndex],
-              opacity: 0.7 - (i * 0.1), // Much more visible opacity
-              isBackground: true,
+            child: Container(
+              margin: EdgeInsets.only(top: 40.h, bottom: 80.h, left: 24.w, right: 24.w),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(40.r),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: gradientColors[i - 1],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: gradientColors[i - 1][0].withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                    spreadRadius: 0,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1947,17 +2402,44 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     final currentImage = widget.imageContents[_currentIndex];
     final rotation = _dragDistance * 0.001; // Convert drag distance to rotation
     final opacity = math.max(0.0, 1.0 - (_dragDistance.abs() * 0.002));
+    
+    // Vertical animation effects
+    final verticalOffset = _isVerticalDragging ? _verticalDragDistance * 0.8 : 0.0;
+    final verticalOpacity = math.max(0.3, 1.0 - (_verticalDragDistance.abs() * 0.001));
+    final verticalScale = math.max(0.85, 1.0 - (_verticalDragDistance.abs() * 0.0003));
+    final verticalRotation = _verticalDragDistance * 0.0005;
 
     return AnimatedBuilder(
-      animation: _animation,
+      animation: Listenable.merge([_animation, _verticalAnimation]),
       builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(_dragDistance, 0),
-          child: Transform.rotate(
-            angle: rotation,
-            child: Opacity(opacity: opacity, child: _buildCard(currentImage)),
-          ),
-        );
+        // Determine which animation to use based on gesture type
+        final isVerticalGesture = _verticalDragDistance.abs() > _dragDistance.abs();
+        
+        if (isVerticalGesture) {
+          // Vertical swipe animation
+          return Transform.translate(
+            offset: Offset(0, verticalOffset + (_verticalAnimation.value * -MediaQuery.of(context).size.height * 1.2)),
+            child: Transform.scale(
+              scale: verticalScale * (1.0 - _verticalAnimation.value * 0.3),
+              child: Transform.rotate(
+                angle: verticalRotation + (_verticalAnimation.value * verticalRotation * 2),
+                child: Opacity(
+                  opacity: verticalOpacity * (1.0 - _verticalAnimation.value),
+                  child: _buildCard(currentImage),
+                ),
+              ),
+            ),
+          );
+        } else {
+          // Horizontal swipe animation
+          return Transform.translate(
+            offset: Offset(_dragDistance, 0),
+            child: Transform.rotate(
+              angle: rotation,
+              child: Opacity(opacity: opacity, child: _buildCard(currentImage)),
+            ),
+          );
+        }
       },
     );
   }
@@ -1968,24 +2450,30 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     bool isBackground = false,
   }) {
     return Container(
-      margin: EdgeInsets.only(top: 10.h, bottom: 40.h, left: 20.w, right: 20.w),
+      margin: EdgeInsets.only(top: 40.h, bottom: 80.h, left: 24.w, right: 24.w),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.all(Radius.circular(20.r)),
-        color: isBackground ? Colors.white.withOpacity(0.1) : null,
+        borderRadius: BorderRadius.circular(40.r),
+        color: isBackground ? Colors.white.withOpacity(0.1) : Colors.white,
         border:
             isBackground
                 ? Border.all(color: Colors.white.withOpacity(0.6), width: 2.0)
                 : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 20,
             offset: const Offset(0, 10),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.all(Radius.circular(20.r)),
+        borderRadius: BorderRadius.circular(40.r),
         child: Stack(
           children: [
             // Image
@@ -2024,53 +2512,7 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
               },
             ),
 
-            // Action buttons (Download, Share)
-            if (!isBackground)
-              Positioned(
-                top: 20,
-                right: 16,
-                child: Row(
-                  children: [
-                    // Download button
-                    GestureDetector(
-                      onTap:
-                          () => _saveImageToGallery(
-                            image.fileUrl ?? '',
-                            image.title ?? '',
-                          ),
-                      child: Container(
-                        height: 50,
-                        width: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
 
-                        child: Icon(Icons.download_rounded),
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    // Share button
-                    GestureDetector(
-                      onTap:
-                          () => _shareImage(
-                            image.fileUrl ?? '',
-                            image.title ?? '',
-                          ),
-                      child: Container(
-                        height: 50,
-                        width: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                        ),
-
-                        child: Icon(Icons.share),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
             // Bottom overlay
             Positioned(
@@ -2078,47 +2520,51 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
               left: 0,
               right: 0,
               child: Container(
-                padding: EdgeInsets.all(20.w),
+                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
                 decoration: BoxDecoration(
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(40.r),
+                    bottomRight: Radius.circular(40.r),
+                  ),
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
-                    colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                    colors: [
+                      Colors.black.withOpacity(0.9),
+                      Colors.black.withOpacity(0.6),
+                      Colors.transparent
+                    ],
+                    stops: [0.0, 0.5, 1.0],
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
-                    Text(
-                      image.title,
-                      style: TextStyle(
-                        fontFamily: 'SFPro',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 18.sp,
-                        color: Colors.white,
+                    Expanded(
+                      child: Text(
+                        image.title ?? 'Le titre de l\'image ira ici',
+                        style: TextStyle(
+                          fontFamily: 'SFPro',
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16.sp,
+                          color: Colors.white,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    // SizedBox(height: 8.h),
-                    // Text(
-                    //   'File Size: ${image.fileSizeMb.toStringAsFixed(1)} MB',
-                    //   style: TextStyle(
-                    //     fontFamily: 'SFPro',
-                    //     fontWeight: FontWeight.w500,
-                    //     fontSize: 14.sp,
-                    //     color: Colors.white70,
-                    //   ),
-                    // ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      'Image ${_currentIndex + 1} of ${widget.imageContents.length}',
-                      style: TextStyle(
-                        fontFamily: 'SFPro',
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14.sp,
-                        color: Colors.white70,
+                    SizedBox(width: 16.w),
+                    GestureDetector(
+                      onTap: () => _shareImage(
+                        image.fileUrl ?? '',
+                        image.title ?? '',
+                      ),
+                      child: Container(
+                        padding: EdgeInsets.all(8.w),
+                        child: Icon(
+                          Icons.share,
+                          color: Colors.white,
+                          size: 24.sp,
+                        ),
                       ),
                     ),
                   ],
@@ -2144,5 +2590,402 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
               ? widget.imageContents.length - 1
               : _currentIndex - 1;
     });
+  }
+
+  void _nextImageVertical() {
+    _verticalAnimationController.forward().then((_) {
+      setState(() {
+        _currentIndex = (_currentIndex + 1) % widget.imageContents.length;
+      });
+      _verticalAnimationController.reset();
+    });
+  }
+
+  void _previousImageVertical() {
+    _verticalAnimationController.forward().then((_) {
+      setState(() {
+        _currentIndex =
+            _currentIndex == 0
+                ? widget.imageContents.length - 1
+                : _currentIndex - 1;
+      });
+      _verticalAnimationController.reset();
+    });
+  }
+}
+
+// Fullscreen PDF Viewer Widget
+class _FullscreenPdfViewer extends StatefulWidget {
+  final String title;
+  final String pdfUrl;
+  final bool isFromCache;
+
+  const _FullscreenPdfViewer({
+    required this.title,
+    required this.pdfUrl,
+    this.isFromCache = false,
+  });
+
+  @override
+  State<_FullscreenPdfViewer> createState() => _FullscreenPdfViewerState();
+}
+
+class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
+  late PdfViewerController _pdfController;
+  double _currentZoomLevel = 1.0;
+  bool _isLoading = true;
+  bool _showControls = true;
+  int _currentPage = 1;
+  int _totalPages = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pdfController = PdfViewerController();
+  }
+
+  @override
+  void dispose() {
+    _pdfController.dispose();
+    super.dispose();
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _currentZoomLevel = (_currentZoomLevel + 0.25).clamp(0.5, 5.0);
+      _pdfController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _currentZoomLevel = (_currentZoomLevel - 0.25).clamp(0.5, 5.0);
+      _pdfController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  void _resetZoom() {
+    setState(() {
+      _currentZoomLevel = 1.0;
+      _pdfController.zoomLevel = _currentZoomLevel;
+    });
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+  }
+
+  void _goToPage() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        int pageNumber = _currentPage;
+        return AlertDialog(
+          title: Text('Go to Page'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Enter page number (1-$_totalPages):'),
+              SizedBox(height: 16),
+              TextField(
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: 'Page number',
+                ),
+                onChanged: (value) {
+                  pageNumber = int.tryParse(value) ?? _currentPage;
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (pageNumber >= 1 && pageNumber <= _totalPages) {
+                  _pdfController.jumpToPage(pageNumber);
+                  Navigator.pop(context);
+                }
+              },
+              child: Text('Go'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _sanitizeUrl(String url) {
+    String u = url.trim();
+    if (u.endsWith('?')) {
+      u = u.substring(0, u.length - 1);
+    }
+    return u;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // PDF Viewer
+          GestureDetector(
+            onTap: _toggleControls,
+            onScaleStart: (details) {
+              // Store initial zoom level for pinch-to-zoom
+            },
+            onScaleUpdate: (details) {
+              if (details.scale != 1.0) {
+                final newZoomLevel = (_currentZoomLevel * details.scale).clamp(0.5, 5.0);
+                if (newZoomLevel != _currentZoomLevel) {
+                  setState(() {
+                    _currentZoomLevel = newZoomLevel;
+                    _pdfController.zoomLevel = _currentZoomLevel;
+                  });
+                }
+              }
+            },
+            child: widget.isFromCache
+                ? SfPdfViewer.file(
+                    File(widget.pdfUrl),
+                    controller: _pdfController,
+                    canShowScrollHead: false,
+                    canShowScrollStatus: false,
+                    enableDoubleTapZooming: true,
+                    enableTextSelection: true,
+                    canShowPaginationDialog: false,
+                    onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                      setState(() {
+                        _isLoading = false;
+                        _totalPages = details.document.pages.count;
+                      });
+                    },
+                    onPageChanged: (PdfPageChangedDetails details) {
+                      setState(() {
+                        _currentPage = details.newPageNumber;
+                      });
+                    },
+                    onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to load cached PDF: ${details.description}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    },
+                  )
+                : SfPdfViewer.network(
+                    _sanitizeUrl(widget.pdfUrl),
+                    controller: _pdfController,
+                    canShowScrollHead: false,
+                    canShowScrollStatus: false,
+                    enableDoubleTapZooming: true,
+                    enableTextSelection: true,
+                    canShowPaginationDialog: false,
+                    onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                      setState(() {
+                        _isLoading = false;
+                        _totalPages = details.document.pages.count;
+                      });
+                    },
+                    onPageChanged: (PdfPageChangedDetails details) {
+                      setState(() {
+                        _currentPage = details.newPageNumber;
+                      });
+                    },
+                    onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+                      setState(() {
+                        _isLoading = false;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to load PDF: ${details.description}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    },
+                  ),
+          ),
+
+          // Loading indicator
+          if (_isLoading)
+            Container(
+              color: Colors.black54,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Loading PDF...',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.sp,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Top controls
+          if (_showControls)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: EdgeInsets.only(
+                  top: MediaQuery.of(context).padding.top + 8,
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.8),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: Colors.white),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.share, color: Colors.white),
+                      onPressed: () {
+                        // Share PDF functionality
+                        Share.share(widget.pdfUrl, subject: widget.title);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Bottom controls
+          if (_showControls)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 16,
+                  top: 16,
+                ),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.8),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Page info
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        '$_currentPage / $_totalPages',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    
+                    // Go to page button
+                    IconButton(
+                      icon: Icon(Icons.bookmark, color: Colors.white),
+                      onPressed: _goToPage,
+                    ),
+                    
+                    Spacer(),
+                    
+                    // Zoom controls
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.remove, color: Colors.white),
+                            onPressed: _currentZoomLevel > 0.5 ? _zoomOut : null,
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              '${(_currentZoomLevel * 100).round()}%',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.refresh, color: Colors.white),
+                            onPressed: _currentZoomLevel != 1.0 ? _resetZoom : null,
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.add, color: Colors.white),
+                            onPressed: _currentZoomLevel < 5.0 ? _zoomIn : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }

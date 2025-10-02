@@ -97,15 +97,15 @@ class BookDetails extends Equatable {
 
   factory BookDetails.fromJson(Map<String, dynamic> json) {
     return BookDetails(
-      bookId: json['book_id'] as String,
-      bookName: json['book_name'] as String,
-      authorName: json['author_name'] as String,
-      editionName: json['edition_name'] as String,
-      totalPages: json['total_pages'] as int,
-      coverImageUrl: json['cover_image_url'] as String,
-      isActive: json['is_active'] as bool,
-      createdAt: json['created_at'] as String,
-      updatedAt: json['updated_at'] as String,
+      bookId: (json['book_id'] as String?) ?? '',
+      bookName: (json['book_name'] as String?) ?? '',
+      authorName: (json['author_name'] as String?) ?? '',
+      editionName: (json['edition_name'] as String?) ?? '',
+      totalPages: (json['total_pages'] as int?) ?? 0,
+      coverImageUrl: (json['cover_image_url'] as String?) ?? '',
+      isActive: (json['is_active'] as bool?) ?? false,
+      createdAt: (json['created_at'] as String?) ?? '',
+      updatedAt: (json['updated_at'] as String?) ?? '',
     );
   }
 

@@ -25,15 +25,15 @@ class BookModel extends Equatable {
 
   factory BookModel.fromJson(Map<String, dynamic> json) {
     return BookModel(
-      id: json['book_id'] as String? ?? json['id'] as String,
-      title: json['book_name'] as String? ?? json['title'] as String,
-      author: json['author_name'] as String? ?? json['author'] as String,
+      id: (json['book_id'] as String?) ?? (json['id'] as String?) ?? '',
+      title: (json['book_name'] as String?) ?? (json['title'] as String?) ?? '',
+      author: (json['author_name'] as String?) ?? (json['author'] as String?) ?? '',
       coverImageUrl:
-          json['cover_image_url'] as String? ?? json['coverImageUrl'] as String,
+          (json['cover_image_url'] as String?) ?? (json['coverImageUrl'] as String?) ?? '',
       description: json['description'] as String?,
       publishedDate:
           json['publishedDate'] != null
-              ? DateTime.parse(json['publishedDate'] as String)
+              ? DateTime.tryParse(json['publishedDate'] as String)
               : null,
       editionName: json['edition_name'] as String?,
       totalPages: json['total_pages'] as int?,

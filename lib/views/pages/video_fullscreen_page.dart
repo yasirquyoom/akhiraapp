@@ -27,6 +27,13 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
   bool _isLoading = true;
   bool _hasError = false;
   bool _isLandscape = false;
+  bool _isFullscreen = false;
+  double _volume = 1.0;
+  double _lastNonZeroVolume = 1.0;
+  bool _isMuted = false;
+  double _playbackSpeed = 1.0;
+  String? _formatLabel;
+  String? _contentType;
 
   @override
   void initState() {
@@ -44,9 +51,12 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
         await _initSampleVideo();
         return;
       }
+      _formatLabel = _detectFormat(sanitizedUrl, _contentType);
       _controller = VideoPlayerController.networkUrl(Uri.parse(sanitizedUrl));
 
       await _controller.initialize();
+      await _controller.setVolume(_volume);
+      await _controller.setPlaybackSpeed(_playbackSpeed);
       setState(() {
         _isLoading = false;
       });
@@ -68,6 +78,8 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
         );
         _controller = VideoPlayerController.file(File(filePath));
         await _controller.initialize();
+        await _controller.setVolume(_volume);
+        await _controller.setPlaybackSpeed(_playbackSpeed);
         setState(() {
           _isLoading = false;
           _hasError = false;
@@ -122,6 +134,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
       final resp = await Dio().head(url);
       final ct = (resp.headers['content-type']?.first ?? '').toLowerCase();
       final ok = resp.statusCode == 200 && ct.startsWith('video/');
+      _contentType = ct;
       print('Video HEAD status=${resp.statusCode}, content-type=$ct, ok=$ok');
       return ok;
     } catch (e) {
@@ -159,6 +172,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -198,6 +212,74 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
         DeviceOrientation.portraitDown,
       ]);
     }
+  }
+
+  void _toggleFullscreen() {
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+    });
+    if (_isFullscreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  void _seekRelative(int seconds) {
+    if (!_controller.value.isInitialized) return;
+    final pos = _controller.value.position;
+    final dur = _controller.value.duration;
+    var target = pos + Duration(seconds: seconds);
+    if (target < Duration.zero) target = Duration.zero;
+    if (target > dur) target = dur;
+    _controller.seekTo(target);
+  }
+
+  void _toggleMute() async {
+    if (_isMuted) {
+      setState(() {
+        _isMuted = false;
+        _volume = _lastNonZeroVolume;
+      });
+      await _controller.setVolume(_volume);
+    } else {
+      setState(() {
+        _isMuted = true;
+        _lastNonZeroVolume = _volume == 0 ? 1.0 : _volume;
+        _volume = 0.0;
+      });
+      await _controller.setVolume(0.0);
+    }
+  }
+
+  Future<void> _setVolume(double v) async {
+    setState(() {
+      _volume = v.clamp(0.0, 1.0);
+      _isMuted = _volume == 0.0;
+      if (!_isMuted) _lastNonZeroVolume = _volume;
+    });
+    await _controller.setVolume(_volume);
+  }
+
+  Future<void> _setPlaybackSpeed(double s) async {
+    setState(() {
+      _playbackSpeed = s;
+    });
+    await _controller.setPlaybackSpeed(s);
+  }
+
+  String _detectFormat(String url, String? contentType) {
+    final lower = url.toLowerCase();
+    String ext = '';
+    final idx = lower.lastIndexOf('.');
+    if (idx != -1) {
+      ext = lower.substring(idx + 1);
+    }
+    String label = ext.isNotEmpty ? ext.toUpperCase() : 'Unknown';
+    if ((contentType ?? '').isNotEmpty) {
+      label = '$label • ${contentType!}';
+    }
+    return label;
   }
 
   String _formatDuration(Duration duration) {
@@ -366,6 +448,25 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (_formatLabel != null) ...[
+                              SizedBox(width: 12.w),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                                child: Text(
+                                  _formatLabel!,
+                                  style: TextStyle(
+                                    fontFamily: 'SFPro',
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12.sp,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -459,6 +560,139 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                           : Icons.screen_rotation_alt,
                                       color: Colors.white,
                                       size: 20.sp,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 12.h),
+                            // Playback Controls Row
+                            Row(
+                              children: [
+                                // Skip Back 10s
+                                GestureDetector(
+                                  onTap: () => _seekRelative(-10),
+                                  child: Container(
+                                    padding: EdgeInsets.all(8.w),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.replay_10,
+                                      color: Colors.white,
+                                      size: 22.sp,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12.w),
+                                // Play/Pause
+                                GestureDetector(
+                                  onTap: _togglePlayPause,
+                                  child: Container(
+                                    padding: EdgeInsets.all(8.w),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      _isPlaying ? Icons.pause : Icons.play_arrow,
+                                      color: Colors.white,
+                                      size: 22.sp,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12.w),
+                                // Skip Forward 10s
+                                GestureDetector(
+                                  onTap: () => _seekRelative(10),
+                                  child: Container(
+                                    padding: EdgeInsets.all(8.w),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.forward_10,
+                                      color: Colors.white,
+                                      size: 22.sp,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 16.w),
+                                // Mute/Unmute
+                                GestureDetector(
+                                  onTap: _toggleMute,
+                                  child: Container(
+                                    padding: EdgeInsets.all(8.w),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      _isMuted || _volume == 0.0 ? Icons.volume_off : Icons.volume_up,
+                                      color: Colors.white,
+                                      size: 22.sp,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 8.w),
+                                // Volume Slider
+                                Expanded(
+                                  child: SliderTheme(
+                                    data: SliderTheme.of(context).copyWith(
+                                      trackHeight: 2.h,
+                                      thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6.r),
+                                    ),
+                                    child: Slider(
+                                      value: _volume,
+                                      min: 0.0,
+                                      max: 1.0,
+                                      onChanged: (v) => _setVolume(v),
+                                      activeColor: AppColors.primary,
+                                      inactiveColor: Colors.white30,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 12.w),
+                                // Playback Speed
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.4),
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                  child: DropdownButton<double>(
+                                    value: _playbackSpeed,
+                                    dropdownColor: Colors.black87,
+                                    underline: SizedBox.shrink(),
+                                    iconEnabledColor: Colors.white,
+                                    style: TextStyle(color: Colors.white, fontSize: 14.sp),
+                                    items: const [
+                                      DropdownMenuItem(value: 0.5, child: Text('0.5x')),
+                                      DropdownMenuItem(value: 1.0, child: Text('1x')),
+                                      DropdownMenuItem(value: 1.5, child: Text('1.5x')),
+                                      DropdownMenuItem(value: 2.0, child: Text('2x')),
+                                    ],
+                                    onChanged: (v) {
+                                      if (v != null) _setPlaybackSpeed(v);
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 12.w),
+                                // Fullscreen Toggle
+                                GestureDetector(
+                                  onTap: _toggleFullscreen,
+                                  child: Container(
+                                    padding: EdgeInsets.all(8.w),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.5),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                                      color: Colors.white,
+                                      size: 22.sp,
                                     ),
                                   ),
                                 ),

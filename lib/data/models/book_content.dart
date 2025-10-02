@@ -31,18 +31,18 @@ class BookContent extends Equatable {
 
   factory BookContent.fromJson(Map<String, dynamic> json) {
     return BookContent(
-      contentId: json['content_id'] as String,
-      bookId: json['book_id'] as String,
-      contentType: json['content_type'] as String,
-      title: json['title'] as String,
-      fileName: json['file_name'] as String,
-      fileUrl: json['file_url'] as String,
+      contentId: (json['content_id'] as String?) ?? '',
+      bookId: (json['book_id'] as String?) ?? '',
+      contentType: (json['content_type'] as String?) ?? '',
+      title: (json['title'] as String?) ?? '',
+      fileName: (json['file_name'] as String?) ?? '',
+      fileUrl: (json['file_url'] as String?) ?? '',
       coverImageUrl: json['cover_image_url'] as String?,
-      fileSizeMb: (json['file_size_mb'] as num).toDouble(),
-      mimeType: json['mime_type'] as String,
-      contentNumber: json['content_number'] as int,
-      createdAt: json['created_at'] as String,
-      updatedAt: json['updated_at'] as String? ?? '',
+      fileSizeMb: ((json['file_size_mb'] as num?) ?? 0).toDouble(),
+      mimeType: (json['mime_type'] as String?) ?? '',
+      contentNumber: (json['content_number'] as int?) ?? 0,
+      createdAt: (json['created_at'] as String?) ?? '',
+      updatedAt: (json['updated_at'] as String?) ?? '',
     );
   }
 
