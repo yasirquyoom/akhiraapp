@@ -149,7 +149,7 @@ class _EmailSentPageState extends State<EmailSentPage> {
                     fontFamily: 'SFPro',
                     fontWeight: FontWeight.w400,
                     fontSize: 16,
-                    color: Colors.white.withOpacity(0.6),
+  color: Colors.white.withValues(alpha: 0.6),
                   ),
                   textAlign: TextAlign.center,
                 ),

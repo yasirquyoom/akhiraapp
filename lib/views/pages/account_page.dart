@@ -100,6 +100,7 @@ class _AccountPageState extends State<AccountPage> {
     try {
       await UrlLauncherService.openFacebook();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -117,6 +118,7 @@ class _AccountPageState extends State<AccountPage> {
     try {
       await UrlLauncherService.openInstagram();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -134,6 +136,7 @@ class _AccountPageState extends State<AccountPage> {
     try {
       await UrlLauncherService.openContactPage();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -372,7 +375,7 @@ class _AccountPageState extends State<AccountPage> {
           width: 40.w,
           height: 40.w,
           decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.1),
+  color: iconColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Image.asset(icon, scale: 4),

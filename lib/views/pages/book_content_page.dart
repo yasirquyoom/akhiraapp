@@ -1,10 +1,13 @@
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'dart:math' as math;
 import 'dart:io';
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
+import 'dart:html' as html;
 import 'dart:typed_data';
 import 'package:akhira/data/cubits/quiz/quiz_cubit_new.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -18,9 +21,9 @@ import '../../data/cubits/book_content/book_content_state.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:gal/gal.dart';
 import 'package:dio/dio.dart';
 import '../../services/pdf_cache_service.dart';
+import '../../data/models/book_content.dart';
 
 class BookContentPage extends StatefulWidget {
   final int initialTabIndex;
@@ -110,10 +113,20 @@ class _BookContentPageState extends State<BookContentPage>
 
   // PDF Caching Methods
   Future<void> _initializePdfCache() async {
+    if (kIsWeb) return;
     await PdfCacheService.initialize();
   }
 
   Future<void> _checkPdfCache(String pdfUrl) async {
+    if (kIsWeb) {
+      setState(() {
+        _isPdfCaching = false;
+        _isPdfCached = false;
+        _cachedPdfPath = null;
+        _cachingProgress = 0.0;
+      });
+      return;
+    }
     if (pdfUrl.isEmpty) return;
     
     setState(() {
@@ -142,11 +155,20 @@ class _BookContentPageState extends State<BookContentPage>
         _isPdfCaching = false;
         _cachingProgress = 0.0;
       });
-      print('Error checking PDF cache: $e');
+      debugPrint('Error checking PDF cache: $e');
     }
   }
 
   Future<void> _cachePdf(String pdfUrl) async {
+    if (kIsWeb) {
+      setState(() {
+        _isPdfCaching = false;
+        _isPdfCached = false;
+        _cachedPdfPath = null;
+        _cachingProgress = 0.0;
+      });
+      return;
+    }
     try {
       final cachedPath = await PdfCacheService.cachePdf(
         pdfUrl,
@@ -175,7 +197,7 @@ class _BookContentPageState extends State<BookContentPage>
         _isPdfCaching = false;
         _cachingProgress = 0.0;
       });
-      print('Error caching PDF: $e');
+      debugPrint('Error caching PDF: $e');
     }
   }
 
@@ -187,6 +209,36 @@ class _BookContentPageState extends State<BookContentPage>
   }
 
   Widget _buildPdfViewer(String pdfUrl) {
+    if (kIsWeb) {
+      return SfPdfViewer.network(
+        _sanitizeUrl(pdfUrl),
+        controller: _pdfViewerController,
+        canShowScrollHead: true,
+        canShowScrollStatus: true,
+        enableDoubleTapZooming: true,
+        enableTextSelection: true,
+        canShowPaginationDialog: true,
+        onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+          debugPrint('Network PDF loaded (web): ${details.document.pages.count} pages');
+        },
+        onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+          debugPrint('Network PDF load failed (web): ${details.error}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load PDF: ${details.description}'),
+              backgroundColor: Colors.red,
+              action: SnackBarAction(
+                label: 'Retry',
+                textColor: Colors.white,
+                onPressed: () {
+                  setState(() {});
+                },
+              ),
+            ),
+          );
+        },
+      );
+    }
     if (_isPdfCached && _cachedPdfPath != null) {
       // Use cached file
       return SfPdfViewer.file(
@@ -198,10 +250,10 @@ class _BookContentPageState extends State<BookContentPage>
         enableTextSelection: true,
         canShowPaginationDialog: true,
         onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-          print('Cached PDF loaded: ${details.document.pages.count} pages');
+          debugPrint('Cached PDF loaded: ${details.document.pages.count} pages');
         },
         onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-          print('Cached PDF load failed: ${details.error}');
+          debugPrint('Cached PDF load failed: ${details.error}');
           // If cached file fails, try to reload from network
           setState(() {
             _isPdfCached = false;
@@ -221,25 +273,20 @@ class _BookContentPageState extends State<BookContentPage>
         enableTextSelection: true,
         canShowPaginationDialog: true,
         onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-          print('Network PDF loaded: ${details.document.pages.count} pages');
+          debugPrint('Network PDF loaded: ${details.document.pages.count} pages');
         },
         onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-          print('Network PDF load failed: ${details.error}');
+          debugPrint('Network PDF load failed: ${details.error}');
+          final openUrl = _sanitizeUrl(pdfUrl);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to load PDF: ${details.description}'),
               backgroundColor: Colors.red,
               action: SnackBarAction(
-                label: 'Retry',
+                label: 'Open in Tab',
                 textColor: Colors.white,
                 onPressed: () {
-                  setState(() {
-                    // Reset cache state and retry
-                    _isPdfCaching = false;
-                    _isPdfCached = false;
-                    _cachedPdfPath = null;
-                  });
-                  _checkPdfCache(pdfUrl);
+                  _openInNewTab(openUrl);
                 },
               ),
             ),
@@ -286,16 +333,27 @@ class _BookContentPageState extends State<BookContentPage>
     }
 
     if (bookId == null || bookId.isEmpty) {
-      print('Warning: Book ID is null or empty, cannot load content');
+      debugPrint('Warning: Book ID is null or empty, cannot load content');
       return;
     }
-
-    print('Loading all content for bookId: $bookId');
+    
+    debugPrint('Loading all content for bookId: $bookId');
     context.read<BookContentCubit>().loadAllBookContent(bookId: bookId);
 
     // Also ensure quiz APIs load for this book on page entry
     // (score first inside cubit, then quizzes)
     context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+  }
+
+  void _openInNewTab(String url) {
+    final u = _sanitizeUrl(url);
+    if (kIsWeb) {
+      try {
+        html.window.open(u, '_blank');
+      } catch (_) {
+        html.window.location.href = u;
+      }
+    }
   }
 
   void _filterContentForCurrentTab() {
@@ -307,7 +365,7 @@ class _BookContentPageState extends State<BookContentPage>
             : bookCubit.getCurrentBookId();
 
     if (bookId == null || bookId.isEmpty) {
-      print('Warning: Book ID is null or empty, cannot filter content');
+      debugPrint('Warning: Book ID is null or empty, cannot filter content');
       return;
     }
 
@@ -330,7 +388,7 @@ class _BookContentPageState extends State<BookContentPage>
         break;
     }
 
-    print('Filtering content for bookId: $bookId, contentType: $contentType');
+    debugPrint('Filtering content for bookId: $bookId, contentType: $contentType');
     context.read<BookContentCubit>().loadContentByType(
       bookId: bookId,
       contentType: contentType ?? '',
@@ -346,7 +404,7 @@ class _BookContentPageState extends State<BookContentPage>
             : bookCubit.getCurrentBookId();
 
     if (bookId == null || bookId.isEmpty) {
-      print('Warning: Book ID is null or empty, cannot refresh content');
+      debugPrint('Warning: Book ID is null or empty, cannot refresh content');
       return;
     }
 
@@ -369,11 +427,23 @@ class _BookContentPageState extends State<BookContentPage>
         break;
     }
 
-    print('Refreshing content for bookId: $bookId, contentType: $contentType');
+    debugPrint('Refreshing content for bookId: $bookId, contentType: $contentType');
     context.read<BookContentCubit>().refreshContentByType(
       bookId: bookId,
       contentType: contentType ?? '',
     );
+  }
+
+  // Helpers to ensure only PDFs are shown in the Digital book tab
+  bool _isPdfContent(BookContent content) {
+    final mime = (content.mimeType).toLowerCase();
+    // Sanitize URL to remove backticks/quotes and trailing '?', then strip query/hash
+    final sanitizedUrl = _sanitizeUrl(content.fileUrl).toLowerCase();
+    final urlNoQuery = sanitizedUrl.split('?').first.split('#').first;
+    final name = (content.fileName).toLowerCase();
+    final isMimePdf = mime.contains('application/pdf') || mime.contains('pdf');
+    final hasPdfExt = urlNoQuery.endsWith('.pdf') || name.endsWith('.pdf');
+    return isMimePdf || hasPdfExt;
   }
 
   @override
@@ -532,7 +602,7 @@ class _BookContentPageState extends State<BookContentPage>
     final bookCubit = context.read<BookCubit>();
     final bookId = bookCubit.getCurrentBookId();
 
-    print('DEBUG: Digital Book Tab - bookId: $bookId');
+    debugPrint('DEBUG: Digital Book Tab - bookId: $bookId');
 
     if (bookId == null || bookId.isEmpty) {
       return Center(
@@ -567,22 +637,24 @@ class _BookContentPageState extends State<BookContentPage>
 
     return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
-        print('DEBUG: Digital Book Tab - state: ${state.runtimeType}');
+        debugPrint('DEBUG: Digital Book Tab - state: ${state.runtimeType}');
         
         if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is BookContentLoaded) {
-          print('DEBUG: Digital Book Tab - loaded data: ${state.data.contents?.length} contents');
-          
-          final ebookContents =
-              state.data.contents
-                  ?.where((content) => content.contentType == 'ebook')
+          debugPrint('DEBUG: Digital Book Tab - loaded data: ${state.data.contents?.length} contents');
+          // Filter to only 'ebook' content type and strictly PDFs
+          final allEbookContents = state.data.contents
+                  ?.where((c) => c.contentType == 'ebook')
                   .toList() ??
               [];
+          final pdfContents = allEbookContents
+              .where((c) => _isPdfContent(c))
+              .toList();
 
-          print('DEBUG: Digital Book Tab - ebook contents: ${ebookContents.length}');
-          
-          if (ebookContents.isEmpty) {
+          debugPrint('DEBUG: Digital Book Tab - ebook contents: ${allEbookContents.length}, pdf-only: ${pdfContents.length}');
+
+          if (pdfContents.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -609,14 +681,14 @@ class _BookContentPageState extends State<BookContentPage>
           }
 
           // Render PDF inline in this tab (first PDF)
-          final ebook = ebookContents.first;
-          print('DEBUG: Digital Book Tab - rendering PDF: ${ebook.title}, URL: ${ebook.fileUrl}');
+          final ebook = pdfContents.first;
+          debugPrint('DEBUG: Digital Book Tab - rendering PDF: ${ebook.title}, URL: ${ebook.fileUrl}');
           return _buildInlinePdfViewer(
             title: ebook.title,
             pdfUrl: ebook.fileUrl,
           );
         } else if (state is BookContentError) {
-          print('DEBUG: Digital Book Tab - error: ${state.message}');
+          debugPrint('DEBUG: Digital Book Tab - error: ${state.message}');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -658,7 +730,7 @@ class _BookContentPageState extends State<BookContentPage>
     required String pdfUrl,
   }) {
     // Initialize caching when PDF URL is available
-    if (pdfUrl.isNotEmpty && !_isPdfCaching && !_isPdfCached) {
+    if (!kIsWeb && pdfUrl.isNotEmpty && !_isPdfCaching && !_isPdfCached) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _checkPdfCache(pdfUrl);
       });
@@ -681,7 +753,7 @@ class _BookContentPageState extends State<BookContentPage>
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+  color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: Offset(0, 2),
               ),
@@ -694,10 +766,10 @@ class _BookContentPageState extends State<BookContentPage>
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                   decoration: BoxDecoration(
-                    color: _isPdfCached ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+  color: _isPdfCached ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8.r),
                     border: Border.all(
-                      color: _isPdfCached ? Colors.green.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+  color: _isPdfCached ? Colors.green.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -739,12 +811,12 @@ class _BookContentPageState extends State<BookContentPage>
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppColors.primary.withOpacity(0.1), Colors.white],
+  colors: [AppColors.primary.withValues(alpha: 0.1), Colors.white],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12.r),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -775,7 +847,7 @@ class _BookContentPageState extends State<BookContentPage>
                   borderRadius: BorderRadius.circular(20.r),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+  color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: Offset(0, 2),
                     ),
@@ -853,7 +925,7 @@ class _BookContentPageState extends State<BookContentPage>
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.8),
+  color: Colors.white.withValues(alpha: 0.8),
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Text(
@@ -880,7 +952,7 @@ class _BookContentPageState extends State<BookContentPage>
                   child: Container(
                     padding: EdgeInsets.all(10.w),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
+  color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20.r),
                     ),
                     child: Icon(
@@ -917,7 +989,7 @@ class _BookContentPageState extends State<BookContentPage>
                 color: Colors.grey[100],
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+  color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: Offset(0, -2),
                   ),
@@ -936,6 +1008,14 @@ class _BookContentPageState extends State<BookContentPage>
     if (u.endsWith('?')) {
       u = u.substring(0, u.length - 1);
     }
+    // Remove stray backticks if present from API formatting
+    u = u.replaceAll('`', '');
+    // Strip surrounding quotes if present
+    if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) {
+      u = u.substring(1, u.length - 1);
+    }
+    // Remove any embedded quotes
+    u = u.replaceAll('"', '').replaceAll("'", '');
     return u;
   }
 
@@ -946,7 +1026,7 @@ class _BookContentPageState extends State<BookContentPage>
         builder: (context) => _FullscreenPdfViewer(
           title: title,
           pdfUrl: effectivePdfUrl,
-          isFromCache: _isPdfCached,
+          isFromCache: !kIsWeb && _isPdfCached,
         ),
       ),
     );
@@ -1050,7 +1130,7 @@ class _BookContentPageState extends State<BookContentPage>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+  color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1165,7 +1245,7 @@ class _BookContentPageState extends State<BookContentPage>
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+  color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -1188,7 +1268,7 @@ class _BookContentPageState extends State<BookContentPage>
                           fit: BoxFit.cover,
                           errorBuilder:
                               (_, __, ___) => Container(
-                                color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
                                 child: const Icon(
                                   Icons.audiotrack,
                                   color: Colors.white,
@@ -1196,7 +1276,7 @@ class _BookContentPageState extends State<BookContentPage>
                               ),
                         )
                         : Container(
-                          color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
                           child: const Icon(
                             Icons.audiotrack,
                             color: Colors.white,
@@ -1470,7 +1550,7 @@ class _BookContentPageState extends State<BookContentPage>
                       : () =>
                           context.read<QuizCubit>().resetBookAnswers(bookId),
               style: ElevatedButton.styleFrom(
-                disabledBackgroundColor: AppColors.primary.withOpacity(0.7),
+  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.7),
               ),
               child:
                   state.isResetting
@@ -1827,7 +1907,7 @@ class _BookContentPageState extends State<BookContentPage>
     final bookCubit = context.read<BookCubit>();
     final bookId = bookCubit.getCurrentBookId();
 
-    print('DEBUG: Videos Tab - bookId: $bookId');
+    debugPrint('DEBUG: Videos Tab - bookId: $bookId');
 
     if (bookId == null || bookId.isEmpty) {
       return Center(
@@ -1862,12 +1942,12 @@ class _BookContentPageState extends State<BookContentPage>
 
     return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
-        print('DEBUG: Videos Tab - state: ${state.runtimeType}');
+        debugPrint('DEBUG: Videos Tab - state: ${state.runtimeType}');
         
         if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is BookContentLoaded) {
-          print('DEBUG: Videos Tab - loaded data: ${state.data.contents?.length} contents');
+          debugPrint('DEBUG: Videos Tab - loaded data: ${state.data.contents?.length} contents');
           
           final videoContents =
               state.data.contents
@@ -1875,7 +1955,7 @@ class _BookContentPageState extends State<BookContentPage>
                   .toList() ??
               [];
 
-          print('DEBUG: Videos Tab - video contents: ${videoContents.length}');
+          debugPrint('DEBUG: Videos Tab - video contents: ${videoContents.length}');
           
           if (videoContents.isEmpty) {
             return Center(
@@ -1903,10 +1983,10 @@ class _BookContentPageState extends State<BookContentPage>
             );
           }
 
-          print('DEBUG: Videos Tab - rendering video list with ${videoContents.length} videos');
+          debugPrint('DEBUG: Videos Tab - rendering video list with ${videoContents.length} videos');
           return _buildVideoList(videoContents);
         } else if (state is BookContentError) {
-          print('DEBUG: Videos Tab - error: ${state.message}');
+          debugPrint('DEBUG: Videos Tab - error: ${state.message}');
           return Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1975,7 +2055,7 @@ class _BookContentPageState extends State<BookContentPage>
             borderRadius: BorderRadius.circular(12.r),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+  color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -2012,8 +2092,8 @@ class _BookContentPageState extends State<BookContentPage>
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withOpacity(0.3),
-                          Colors.black.withOpacity(0.1),
+  Colors.black.withValues(alpha: 0.3),
+  Colors.black.withValues(alpha: 0.1),
                         ],
                       ),
                     ),
@@ -2022,11 +2102,11 @@ class _BookContentPageState extends State<BookContentPage>
                         width: 60.w,
                         height: 60.w,
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.9),
+  color: AppColors.primary.withValues(alpha: 0.9),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
+  color: Colors.black.withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -2054,7 +2134,7 @@ class _BookContentPageState extends State<BookContentPage>
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-                          Colors.black.withOpacity(0.8),
+  Colors.black.withValues(alpha: 0.8),
                           Colors.transparent,
                         ],
                       ),
@@ -2190,41 +2270,7 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     return u;
   }
 
-  Future<void> _saveImageToGallery(String url, String fileName) async {
-    try {
-      final dio = Dio();
-      final response = await dio.get<List<int>>(
-        _sanitizeUrlLocal(url),
-        options: Options(responseType: ResponseType.bytes),
-      );
-
-      final bytes = Uint8List.fromList(response.data ?? []);
-
-      final has = await Gal.hasAccess();
-      if (!has) {
-        await Gal.requestAccess();
-      }
-
-      await Gal.putImageBytes(
-        bytes,
-        album: 'Akhira',
-        name:
-            fileName.isNotEmpty
-                ? fileName
-                : 'image_${DateTime.now().millisecondsSinceEpoch}',
-      );
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Saved to gallery')));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error saving image: $e')));
-    }
-  }
+  // _saveImageToGallery removed as unused to satisfy analyzer warnings.
 
   Future<void> _shareImage(String url, String fileName) async {
     try {
@@ -2241,7 +2287,13 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
       final file = File(filePath);
       await file.writeAsBytes(bytes);
 
-      await Share.shareXFiles([XFile(file.path)]);
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Shared from Akhira',
+          title: 'Share Image',
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -2382,7 +2434,7 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: gradientColors[i - 1][0].withOpacity(0.3),
+  color: gradientColors[i - 1][0].withValues(alpha: 0.3),
                     blurRadius: 15,
                     offset: const Offset(0, 8),
                     spreadRadius: 0,
@@ -2446,27 +2498,26 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
 
   Widget _buildCard(
     dynamic image, {
-    double opacity = 1.0,
     bool isBackground = false,
   }) {
     return Container(
       margin: EdgeInsets.only(top: 40.h, bottom: 80.h, left: 24.w, right: 24.w),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(40.r),
-        color: isBackground ? Colors.white.withOpacity(0.1) : Colors.white,
+  color: isBackground ? Colors.white.withValues(alpha: 0.1) : Colors.white,
         border:
             isBackground
-                ? Border.all(color: Colors.white.withOpacity(0.6), width: 2.0)
+  ? Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2.0)
                 : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+  color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 10),
             spreadRadius: 0,
           ),
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+  color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 4),
           ),
@@ -2530,8 +2581,8 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      Colors.black.withOpacity(0.9),
-                      Colors.black.withOpacity(0.6),
+  Colors.black.withValues(alpha: 0.9),
+  Colors.black.withValues(alpha: 0.6),
                       Colors.transparent
                     ],
                     stops: [0.0, 0.5, 1.0],
@@ -2644,6 +2695,18 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
     _pdfController = PdfViewerController();
   }
 
+  void _openInNewTab(String url) {
+    final u = _sanitizeUrl(url);
+    if (kIsWeb) {
+      try {
+        html.window.open(u, '_blank');
+      } catch (e) {
+        // Fallback: try setting location
+        html.window.location.href = u;
+      }
+    }
+  }
+
   @override
   void dispose() {
     _pdfController.dispose();
@@ -2726,6 +2789,12 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
     if (u.endsWith('?')) {
       u = u.substring(0, u.length - 1);
     }
+    // Remove stray backticks and quotes
+    u = u.replaceAll('`', '');
+    if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) {
+      u = u.substring(1, u.length - 1);
+    }
+    u = u.replaceAll('"', '').replaceAll("'", '');
     return u;
   }
 
@@ -2807,10 +2876,22 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                       setState(() {
                         _isLoading = false;
                       });
+                      final openUrl = _sanitizeUrl(widget.pdfUrl);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Failed to load PDF: ${details.description}'),
                           backgroundColor: Colors.red,
+                          action: SnackBarAction(
+                            label: 'Open in Tab',
+                            textColor: Colors.white,
+                            onPressed: () {
+                              // Use browser navigation for web
+                              // ignore: unsafe_html
+                              // For Flutter web, prefer launching a new tab via html.window
+                              // to avoid plugin overhead.
+                              _openInNewTab(openUrl);
+                            },
+                          ),
                         ),
                       );
                     },
@@ -2859,7 +2940,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.8),
+  Colors.black.withValues(alpha: 0.8),
                       Colors.transparent,
                     ],
                   ),
@@ -2882,12 +2963,24 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    IconButton(
+                    Builder(
+                      builder: (ctx) => IconButton(
                       icon: Icon(Icons.share, color: Colors.white),
                       onPressed: () {
-                        // Share PDF functionality
-                        Share.share(widget.pdfUrl, subject: widget.title);
+                        // Share PDF functionality (updated API)
+                        final box = ctx.findRenderObject() as RenderBox?;
+                        SharePlus.instance.share(
+                          ShareParams(
+                            uri: Uri.parse(widget.pdfUrl),
+                            title: widget.title,
+                            subject: widget.title,
+                            sharePositionOrigin: box != null
+                                ? (box.localToGlobal(Offset.zero) & box.size)
+                                : null,
+                          ),
+                        );
                       },
+                      ),
                     ),
                   ],
                 ),
@@ -2912,7 +3005,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-                      Colors.black.withOpacity(0.8),
+  Colors.black.withValues(alpha: 0.8),
                       Colors.transparent,
                     ],
                   ),
@@ -2923,7 +3016,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
@@ -2948,7 +3041,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                     // Zoom controls
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(

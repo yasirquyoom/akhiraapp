@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
@@ -120,7 +120,7 @@ class PdfCacheService {
         return cacheFilePath;
       }
     } catch (e) {
-      print('Error caching PDF: $e');
+      debugPrint('Error caching PDF: $e');
     }
     
     return null;
@@ -140,7 +140,7 @@ class PdfCacheService {
         await metaFile.delete();
       }
     } catch (e) {
-      print('Error deleting cache file: $e');
+      debugPrint('Error deleting cache file: $e');
     }
   }
 
@@ -176,7 +176,7 @@ class PdfCacheService {
         }
       }
     } catch (e) {
-      print('Error cleaning up expired files: $e');
+      debugPrint('Error cleaning up expired files: $e');
     }
   }
 
@@ -232,7 +232,7 @@ class PdfCacheService {
         }
       }
     } catch (e) {
-      print('Error managing cache size: $e');
+      debugPrint('Error managing cache size: $e');
     }
   }
 
@@ -246,7 +246,7 @@ class PdfCacheService {
         await _cacheDirectory!.create(recursive: true);
       }
     } catch (e) {
-      print('Error clearing cache: $e');
+      debugPrint('Error clearing cache: $e');
     }
   }
 

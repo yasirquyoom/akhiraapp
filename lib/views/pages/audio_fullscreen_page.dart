@@ -122,7 +122,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
               width: 40.w,
               height: 40.w,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
@@ -181,7 +181,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
                       borderRadius: BorderRadius.circular(20.r),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+  color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 20,
                           offset: const Offset(0, 10),
                         ),
@@ -255,7 +255,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
                   //     fontFamily: 'SFPro',
                   //     fontWeight: FontWeight.w400,
                   //     fontSize: 12.sp,
-                  //     color: Colors.white.withOpacity(0.6),
+//     color: Colors.white.withValues(alpha: 0.6),
                   //   ),
                   //   textAlign: TextAlign.center,
                   // ),
@@ -297,9 +297,9 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
         SliderTheme(
           data: SliderTheme.of(context).copyWith(
             activeTrackColor: Colors.white,
-            inactiveTrackColor: Colors.white.withOpacity(0.3),
+  inactiveTrackColor: Colors.white.withValues(alpha: 0.3),
             thumbColor: Colors.white,
-            overlayColor: Colors.white.withOpacity(0.2),
+  overlayColor: Colors.white.withValues(alpha: 0.2),
             trackHeight: 4.h,
           ),
           child: Builder(
@@ -384,7 +384,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.remove, color: Colors.white, size: 20.sp),
@@ -397,7 +397,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
         Container(
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(20.r),
           ),
           child: Text(
@@ -420,7 +420,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.add, color: Colors.white, size: 20.sp),
@@ -436,7 +436,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
             width: 40.w,
             height: 40.w,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(Icons.refresh, color: Colors.white, size: 20.sp),
@@ -457,7 +457,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
           },
           icon: Icon(
             Icons.shuffle,
-            color: Colors.white.withOpacity(0.7),
+  color: Colors.white.withValues(alpha: 0.7),
             size: 24.sp,
           ),
         ),
@@ -510,7 +510,7 @@ class _AudioFullscreenPageState extends State<AudioFullscreenPage>
           },
           icon: Icon(
             Icons.repeat,
-            color: Colors.white.withOpacity(0.7),
+  color: Colors.white.withValues(alpha: 0.7),
             size: 24.sp,
           ),
         ),

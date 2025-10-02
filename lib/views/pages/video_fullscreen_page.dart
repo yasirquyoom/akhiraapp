@@ -1,15 +1,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:video_player/video_player.dart';
 import 'package:dio/dio.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/models/video_model.dart';
 import '../../constants/app_colors.dart';
 import '../../router/app_router.dart';
+import '../../utils/fullscreen_util_stub.dart' if (dart.library.html) '../../utils/fullscreen_util_web.dart';
 
 class VideoFullscreenPage extends StatefulWidget {
   final VideoModel video;
@@ -44,13 +44,10 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
   void _initializeVideo() async {
     try {
       final sanitizedUrl = _sanitizeUrl(widget.video.videoUrl);
-      // Validate that the URL returns a real video payload before initializing
-      final ok = await _isVideoUrlAccessible(sanitizedUrl);
-      if (!ok) {
-        print('Video URL not accessible as video. Falling back to sample.');
-        await _initSampleVideo();
-        return;
-      }
+      // Best-effort fetch of content-type for labeling (may fail due to CORS on web)
+      try {
+        await _isVideoUrlAccessible(sanitizedUrl);
+      } catch (_) {}
       _formatLabel = _detectFormat(sanitizedUrl, _contentType);
       _controller = VideoPlayerController.networkUrl(Uri.parse(sanitizedUrl));
 
@@ -70,39 +67,15 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
         }
       });
     } catch (e) {
-      print('Error initializing video: $e');
-      // Fallback to local file
+      debugPrint('Error initializing video: $e');
+      // Final fallback: sample URL to keep UX working
       try {
-        final filePath = await _downloadVideoToTemp(
-          _sanitizeUrl(widget.video.videoUrl),
-        );
-        _controller = VideoPlayerController.file(File(filePath));
-        await _controller.initialize();
-        await _controller.setVolume(_volume);
-        await _controller.setPlaybackSpeed(_playbackSpeed);
+        await _initSampleVideo();
+      } catch (e3) {
         setState(() {
           _isLoading = false;
-          _hasError = false;
+          _hasError = true;
         });
-        _controller.addListener(() {
-          if (_controller.value.position >= _controller.value.duration) {
-            setState(() {
-              _isPlaying = false;
-            });
-            _controller.pause();
-          }
-        });
-      } catch (e2) {
-        print('Video file fallback failed: $e2');
-        // Final fallback: sample URL to keep UX working
-        try {
-          await _initSampleVideo();
-        } catch (e3) {
-          setState(() {
-            _isLoading = false;
-            _hasError = true;
-          });
-        }
       }
     }
   }
@@ -115,30 +88,16 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
     return u;
   }
 
-  Future<String> _downloadVideoToTemp(String url) async {
-    final dir = await getTemporaryDirectory();
-    final path =
-        '${dir.path}/video_${DateTime.now().millisecondsSinceEpoch}.mp4';
-    final dio = Dio();
-    final resp = await dio.get<List<int>>(
-      url,
-      options: Options(responseType: ResponseType.bytes, followRedirects: true),
-    );
-    final file = File(path);
-    await file.writeAsBytes(resp.data ?? <int>[]);
-    return path;
-  }
-
   Future<bool> _isVideoUrlAccessible(String url) async {
     try {
       final resp = await Dio().head(url);
       final ct = (resp.headers['content-type']?.first ?? '').toLowerCase();
       final ok = resp.statusCode == 200 && ct.startsWith('video/');
       _contentType = ct;
-      print('Video HEAD status=${resp.statusCode}, content-type=$ct, ok=$ok');
+      debugPrint('Video HEAD status=${resp.statusCode}, content-type=$ct, ok=$ok');
       return ok;
     } catch (e) {
-      print('Video HEAD failed: $e');
+      debugPrint('Video HEAD failed: $e');
       return false;
     }
   }
@@ -165,14 +124,18 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
   @override
   void dispose() {
     _controller.dispose();
-    // Reset orientation to allow all orientations when leaving
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // Reset fullscreen/orientation on exit
+    if (kIsWeb) {
+      FullscreenUtil.exitFullscreen();
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     super.dispose();
   }
 
@@ -198,19 +161,20 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
     setState(() {
       _isLandscape = !_isLandscape;
     });
-
-    if (_isLandscape) {
-      // Force landscape orientation
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
-    } else {
-      // Force portrait orientation
-      SystemChrome.setPreferredOrientations([
-        DeviceOrientation.portraitUp,
-        DeviceOrientation.portraitDown,
-      ]);
+    if (!kIsWeb) {
+      if (_isLandscape) {
+        // Force landscape orientation
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      } else {
+        // Force portrait orientation
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
     }
   }
 
@@ -219,9 +183,9 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
       _isFullscreen = !_isFullscreen;
     });
     if (_isFullscreen) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      FullscreenUtil.enterFullscreen();
     } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      FullscreenUtil.exitFullscreen();
     }
   }
 
@@ -388,7 +352,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              Colors.black.withOpacity(0.7),
+  Colors.black.withValues(alpha: 0.7),
                               Colors.transparent,
                             ],
                           ),
@@ -404,7 +368,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                               child: Container(
                                 padding: EdgeInsets.all(8.w),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
@@ -421,7 +385,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                               child: Container(
                                 padding: EdgeInsets.all(8.w),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Icon(
@@ -453,7 +417,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                               Container(
                                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+  color: Colors.white.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(12.r),
                                 ),
                                 child: Text(
@@ -480,7 +444,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                           width: 80.w,
                           height: 80.w,
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -504,7 +468,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
                             colors: [
-                              Colors.black.withOpacity(0.7),
+  Colors.black.withValues(alpha: 0.7),
                               Colors.transparent,
                             ],
                           ),
@@ -518,8 +482,8 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                               allowScrubbing: true,
                               colors: VideoProgressColors(
                                 playedColor: AppColors.primary,
-                                backgroundColor: Colors.white.withOpacity(0.3),
-                                bufferedColor: Colors.white.withOpacity(0.5),
+  backgroundColor: Colors.white.withValues(alpha: 0.3),
+  bufferedColor: Colors.white.withValues(alpha: 0.5),
                               ),
                             ),
                             SizedBox(height: 12.h),
@@ -551,7 +515,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                   child: Container(
                                     padding: EdgeInsets.all(6.w),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -575,7 +539,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                   child: Container(
                                     padding: EdgeInsets.all(8.w),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -592,7 +556,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                   child: Container(
                                     padding: EdgeInsets.all(8.w),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -609,7 +573,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                   child: Container(
                                     padding: EdgeInsets.all(8.w),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -626,7 +590,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                   child: Container(
                                     padding: EdgeInsets.all(8.w),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(
@@ -659,7 +623,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                 Container(
                                   padding: EdgeInsets.symmetric(horizontal: 8.w),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.4),
+  color: Colors.black.withValues(alpha: 0.4),
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
                                   child: DropdownButton<double>(
@@ -686,7 +650,7 @@ class _VideoFullscreenPageState extends State<VideoFullscreenPage> {
                                   child: Container(
                                     padding: EdgeInsets.all(8.w),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
                                       shape: BoxShape.circle,
                                     ),
                                     child: Icon(

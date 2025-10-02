@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 
 class BookCollection extends Equatable {
   final String collectionId;
@@ -22,7 +23,7 @@ class BookCollection extends Equatable {
   });
 
   factory BookCollection.fromJson(Map<String, dynamic> json) {
-    print('BookCollection JSON: $json');
+    debugPrint('BookCollection JSON: $json');
     return BookCollection(
       collectionId: json['collection_id'] as String? ?? '',
       bookId: json['book_id'] as String? ?? '',

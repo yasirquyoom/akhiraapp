@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/app_assets.dart';
@@ -19,7 +18,6 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_feedback.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/height_spacer.dart';
-import '../../widgets/social_media_links.dart';
 import '../../widgets/shimmer_book_card.dart';
 
 class HomePage extends StatefulWidget {
@@ -83,8 +81,13 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          _onWillPop();
+        }
+      },
       child: Scaffold(
         backgroundColor: const Color(0xFFD6DCED),
         body: SafeArea(
@@ -355,7 +358,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildAddBookModal(HomeState state) {
     return Container(
-      color: Colors.black.withOpacity(0.5),
+  color: Colors.black.withValues(alpha: 0.5),
       child: Column(
         children: [
           const Spacer(),

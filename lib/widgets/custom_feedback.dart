@@ -112,7 +112,7 @@ class _CustomFeedbackState extends State<CustomFeedback>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: _getBackgroundColor().withOpacity(0.3),
+  color: _getBackgroundColor().withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
@@ -132,7 +132,7 @@ class _CustomFeedbackState extends State<CustomFeedback>
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -162,7 +162,7 @@ class _CustomFeedbackState extends State<CustomFeedback>
                             width: 32,
                             height: 32,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+  color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: const Icon(

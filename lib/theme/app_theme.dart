@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../constants/app_colors.dart';
 import '../constants/app_constants.dart';
@@ -34,8 +33,8 @@ class AppTheme {
       filledButtonTheme: _filledButtonTheme(),
       chipTheme: base.chipTheme.copyWith(
         selectedColor: AppColors.tabActiveBg,
-        backgroundColor: AppColors.tabActiveBg.withOpacity(0.25),
-        side: BorderSide(color: AppColors.primary.withOpacity(0.2)),
+  backgroundColor: AppColors.tabActiveBg.withValues(alpha: 0.25),
+  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
         labelStyle: TextStyle(color: AppColors.primary),
       ),
       dividerTheme: DividerThemeData(color: Colors.grey.shade200, space: 1),
@@ -52,7 +51,7 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         trackColor: WidgetStateProperty.resolveWith(
-          (states) => AppColors.primary.withOpacity(0.5),
+  (states) => AppColors.primary.withValues(alpha: 0.5),
         ),
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => AppColors.primary,

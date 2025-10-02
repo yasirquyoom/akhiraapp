@@ -42,7 +42,7 @@ class AudioMiniPlayer extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),
@@ -89,7 +89,7 @@ class AudioMiniPlayer extends StatelessWidget {
                           Row(
                             children: [
                               // Crescent moon
-                              Container(
+                              SizedBox(
                                 width: 24,
                                 height: 24,
                                 child: CustomPaint(
@@ -130,7 +130,7 @@ class AudioMiniPlayer extends StatelessWidget {
                                 ),
                                 
                                 // Central book
-                                Container(
+                                SizedBox(
                                   width: 60,
                                   height: 50,
                                   child: CustomPaint(
@@ -143,7 +143,7 @@ class AudioMiniPlayer extends StatelessWidget {
                                   flex: 1,
                                   child: Align(
                                     alignment: Alignment.centerRight,
-                                    child: Container(
+                                    child: SizedBox(
                                       width: 20,
                                       height: 40,
                                       child: CustomPaint(
@@ -191,7 +191,7 @@ class AudioMiniPlayer extends StatelessWidget {
                                 height: 4,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(2),
-                                  color: Colors.white.withOpacity(0.3),
+  color: Colors.white.withValues(alpha: 0.3),
                                 ),
                                 child: FractionallySizedBox(
                                   alignment: Alignment.centerLeft,
@@ -301,13 +301,7 @@ class AudioMiniPlayer extends StatelessWidget {
     );
   }
 
-  String _sanitizeUrl(String url) {
-    var u = url.trim();
-    if (u.endsWith('?')) {
-      u = u.substring(0, u.length - 1);
-    }
-    return u;
-  }
+  // Removed unused _sanitizeUrl helper to satisfy analyzer warnings.
 
   String _formatTime(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
@@ -322,7 +316,7 @@ class IslamicPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+  ..color = Colors.white.withValues(alpha: 0.1)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
@@ -384,11 +378,11 @@ class BookPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
       
     final shadowPaint = Paint()
-      ..color = Colors.black.withOpacity(0.2)
+  ..color = Colors.black.withValues(alpha: 0.2)
       ..style = PaintingStyle.fill;
       
     final linePaint = Paint()
-      ..color = Colors.black.withOpacity(0.3)
+  ..color = Colors.black.withValues(alpha: 0.3)
       ..strokeWidth = 0.5
       ..style = PaintingStyle.stroke;
 

@@ -162,14 +162,14 @@ class _ImageCardStackState extends State<ImageCardStack>
       margin: EdgeInsets.only(top: 10.h, bottom: 40.h, left: 20.w, right: 20.w),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.all(Radius.circular(20.r)),
-        color: isBackground ? Colors.white.withOpacity(0.1) : null,
+  color: isBackground ? Colors.white.withValues(alpha: 0.1) : null,
         border:
             isBackground
-                ? Border.all(color: Colors.white.withOpacity(0.6), width: 2.0)
+  ? Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2.0)
                 : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+  color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -211,7 +211,7 @@ class _ImageCardStackState extends State<ImageCardStack>
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.8 * opacity),
+  Colors.black.withValues(alpha: 0.8 * opacity),
                     ],
                   ),
                   borderRadius: BorderRadius.only(
@@ -230,7 +230,7 @@ class _ImageCardStackState extends State<ImageCardStack>
                         fontFamily: 'SFPro',
                         fontWeight: FontWeight.w600,
                         fontSize: 18.sp,
-                        color: Colors.white.withOpacity(opacity),
+  color: Colors.white.withValues(alpha: opacity),
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -277,12 +277,12 @@ class _ImageCardStackState extends State<ImageCardStack>
         width: 50.w,
         height: 50.w,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2 * opacity),
+  color: Colors.white.withValues(alpha: 0.2 * opacity),
           shape: BoxShape.circle,
         ),
         child: Icon(
           icon,
-          color: Colors.white.withOpacity(opacity),
+  color: Colors.white.withValues(alpha: opacity),
           size: 24.sp,
         ),
       ),

@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
 
 class AudioTrack {
   final String id;
@@ -145,7 +145,7 @@ class AudioCubit extends Cubit<AudioState> {
 
   void _setupAudioPlayer() {
     _audioPlayer.onDurationChanged.listen((duration) {
-      print('Duration changed: $duration');
+      debugPrint('Duration changed: $duration');
       if (state is AudioLoaded) {
         final currentState = state as AudioLoaded;
         emit(currentState.copyWith(totalDuration: duration));
@@ -160,11 +160,11 @@ class AudioCubit extends Cubit<AudioState> {
     });
 
     _audioPlayer.onPlayerStateChanged.listen((playerState) {
-      print('Player state changed: $playerState');
+      debugPrint('Player state changed: $playerState');
       if (state is AudioLoaded) {
         final currentState = state as AudioLoaded;
         bool isPlaying = playerState == PlayerState.playing;
-        print('Updating isPlaying to: $isPlaying');
+        debugPrint('Updating isPlaying to: $isPlaying');
         emit(currentState.copyWith(isPlaying: isPlaying));
       }
 
@@ -177,7 +177,7 @@ class AudioCubit extends Cubit<AudioState> {
     });
 
     _audioPlayer.onPlayerComplete.listen((event) {
-      print('Player completed');
+      debugPrint('Player completed');
       if (state is AudioLoaded) {
         final currentState = state as AudioLoaded;
         // Reset to start and pause after completion
@@ -237,7 +237,7 @@ class AudioCubit extends Cubit<AudioState> {
         emit(AudioInitial());
       }
     } catch (e) {
-      print('Error parsing audio content: $e');
+      debugPrint('Error parsing audio content: $e');
       emit(AudioError(message: 'Failed to load audio tracks: ${e.toString()}'));
     }
   }
@@ -248,10 +248,10 @@ class AudioCubit extends Cubit<AudioState> {
       final response = await Dio()
           .head(url)
           .timeout(const Duration(seconds: 10));
-      print('URL accessibility test: ${response.statusCode}');
+      debugPrint('URL accessibility test: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
-      print('URL accessibility test failed: $e');
+      debugPrint('URL accessibility test failed: $e');
       return false;
     }
   }
@@ -261,8 +261,8 @@ class AudioCubit extends Cubit<AudioState> {
       return;
     }
     _isStartingPlayback = true;
-    print('Attempting to play track: ${track.title}');
-    print('Audio URL: ${track.audioUrl}');
+    debugPrint('Attempting to play track: ${track.title}');
+    debugPrint('Audio URL: ${track.audioUrl}');
 
     // Validate audio URL
     if (track.audioUrl.isEmpty) {
@@ -276,7 +276,7 @@ class AudioCubit extends Cubit<AudioState> {
       final String inferredMimeType = _inferMimeTypeFromUrl(sanitizedUrl);
 
       // Test URL accessibility first
-      print('Testing URL accessibility...');
+      debugPrint('Testing URL accessibility...');
       final isAccessible = await _testUrlAccessibility(sanitizedUrl);
       if (!isAccessible) {
         emit(
@@ -287,11 +287,11 @@ class AudioCubit extends Cubit<AudioState> {
         );
         return;
       }
-      print('URL is accessible, proceeding with playback...');
+      debugPrint('URL is accessible, proceeding with playback...');
 
       // Stop current audio if playing
       await _audioPlayer.stop();
-      print('Stopped current audio');
+      debugPrint('Stopped current audio');
 
       // If we have a loaded state, update it with the new track
       if (state is AudioLoaded) {
@@ -314,7 +314,7 @@ class AudioCubit extends Cubit<AudioState> {
           ),
         );
       }
-      print('Updated state');
+      debugPrint('Updated state');
 
       // Prefer local fallback on iOS for WAV to avoid AVPlayer stalls
       if (Platform.isIOS && sanitizedUrl.toLowerCase().endsWith('.wav')) {
@@ -322,20 +322,20 @@ class AudioCubit extends Cubit<AudioState> {
           sanitizedUrl,
           suggestExt: '.wav',
         );
-        print('iOS WAV: Playing local file first: $localPath');
+        debugPrint('iOS WAV: Playing local file first: $localPath');
         await _audioPlayer
             .play(DeviceFileSource(localPath))
             .timeout(
               const Duration(seconds: 45),
               onTimeout: () {
-                print('Local play timeout');
+                debugPrint('Local play timeout');
                 throw TimeoutException(
                   'Local play timeout',
                   const Duration(seconds: 45),
                 );
               },
             );
-        print('Started playing audio (local WAV)');
+        debugPrint('Started playing audio (local WAV)');
         _startPositionTicker();
         await _refreshDurationFromPlayer();
         if (state is AudioLoaded) {
@@ -347,20 +347,20 @@ class AudioCubit extends Cubit<AudioState> {
       }
 
       // Stream first for other types
-      print('Playing audio directly: $sanitizedUrl (mime: $inferredMimeType)');
+      debugPrint('Playing audio directly: $sanitizedUrl (mime: $inferredMimeType)');
       await _audioPlayer
           .play(UrlSource(sanitizedUrl, mimeType: inferredMimeType))
           .timeout(
             const Duration(seconds: 45),
             onTimeout: () {
-              print('Audio play timeout');
+              debugPrint('Audio play timeout');
               throw TimeoutException(
                 'Audio play timeout',
                 const Duration(seconds: 45),
               );
             },
           );
-      print('Started playing audio (stream)');
+      debugPrint('Started playing audio (stream)');
       _startPositionTicker();
       await _refreshDurationFromPlayer();
       if (state is AudioLoaded) {
@@ -369,28 +369,28 @@ class AudioCubit extends Cubit<AudioState> {
       }
       _isStartingPlayback = false;
       return;
-    } on Object catch (streamErr) {
-      print('Stream play failed: $streamErr');
+    } on Exception catch (streamErr) {
+      debugPrint('Stream play failed: $streamErr');
       // Fallback: download to temp and play as local file
       try {
         final localPath = await _downloadToTemp(
           _sanitizeUrl(track.audioUrl),
           suggestExt: _extFromUrl(_sanitizeUrl(track.audioUrl)),
         );
-        print('Playing local file fallback: $localPath');
+        debugPrint('Playing local file fallback: $localPath');
         await _audioPlayer
             .play(DeviceFileSource(localPath))
             .timeout(
               const Duration(seconds: 45),
               onTimeout: () {
-                print('Local play timeout');
+                debugPrint('Local play timeout');
                 throw TimeoutException(
                   'Local play timeout',
                   const Duration(seconds: 45),
                 );
               },
             );
-        print('Started playing audio (local)');
+        debugPrint('Started playing audio (local)');
         _startPositionTicker();
         await _refreshDurationFromPlayer();
         if (state is AudioLoaded) {
@@ -399,25 +399,25 @@ class AudioCubit extends Cubit<AudioState> {
         }
         _isStartingPlayback = false;
         return;
-      } on Object catch (localErr) {
-        print('Local play failed: $localErr');
+      } on Exception catch (localErr) {
+        debugPrint('Local play failed: $localErr');
         try {
           // Final fallback: play from bytes
           final bytes = await _downloadBytes(_sanitizeUrl(track.audioUrl));
-          print('Playing bytes source (${bytes.lengthInBytes} bytes)');
+          debugPrint('Playing bytes source (${bytes.lengthInBytes} bytes)');
           await _audioPlayer
               .play(BytesSource(bytes))
               .timeout(
                 const Duration(seconds: 45),
                 onTimeout: () {
-                  print('Bytes play timeout');
+                  debugPrint('Bytes play timeout');
                   throw TimeoutException(
                     'Bytes play timeout',
                     const Duration(seconds: 45),
                   );
                 },
               );
-          print('Started playing audio (bytes)');
+          debugPrint('Started playing audio (bytes)');
           _startPositionTicker();
           await _refreshDurationFromPlayer();
           if (state is AudioLoaded) {
@@ -426,15 +426,15 @@ class AudioCubit extends Cubit<AudioState> {
           }
           _isStartingPlayback = false;
           return;
-        } on Object catch (bytesErr) {
-          print('Bytes play failed: $bytesErr');
+        } on Exception catch (bytesErr) {
+          debugPrint('Bytes play failed: $bytesErr');
         }
       }
 
       // Mark playing after successful start
     } catch (e) {
-      print('Error playing audio: $e');
-      print('Error type: ${e.runtimeType}');
+      debugPrint('Error playing audio: $e');
+      debugPrint('Error type: ${e.runtimeType}');
       if (state is AudioLoaded) {
         final currentState = state as AudioLoaded;
         emit(currentState.copyWith(isPlaying: false));
@@ -456,7 +456,7 @@ class AudioCubit extends Cubit<AudioState> {
       try {
         const sampleUrl =
             'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
-        print('Attempting sample fallback playback: $sampleUrl');
+        debugPrint('Attempting sample fallback playback: $sampleUrl');
         await _audioPlayer.play(UrlSource(sampleUrl));
         _startPositionTicker();
         await _refreshDurationFromPlayer();
@@ -478,11 +478,11 @@ class AudioCubit extends Cubit<AudioState> {
             ),
           );
         }
-        print('Sample fallback started');
+        debugPrint('Sample fallback started');
         _isStartingPlayback = false;
         return;
       } catch (sampleErr) {
-        print('Sample fallback failed: $sampleErr');
+        debugPrint('Sample fallback failed: $sampleErr');
       }
 
       emit(AudioError(message: errorMessage));
@@ -561,7 +561,7 @@ class AudioCubit extends Cubit<AudioState> {
     final filePath =
         '${dir.path}/audio_${DateTime.now().millisecondsSinceEpoch}$suggestExt';
     final dio = Dio();
-    print('Downloading audio to $filePath');
+        debugPrint('Downloading audio to $filePath');
     final response = await dio.get<List<int>>(
       url,
       options: Options(responseType: ResponseType.bytes, followRedirects: true),
@@ -587,7 +587,7 @@ class AudioCubit extends Cubit<AudioState> {
         emit(currentState.copyWith(isPlaying: false));
         await _audioPlayer.pause();
       } catch (e) {
-        print('Error pausing audio: $e');
+        debugPrint('Error pausing audio: $e');
       }
     }
   }
@@ -599,7 +599,7 @@ class AudioCubit extends Cubit<AudioState> {
         emit(currentState.copyWith(isPlaying: true));
         await _audioPlayer.resume();
       } catch (e) {
-        print('Error resuming audio: $e');
+        debugPrint('Error resuming audio: $e');
       }
     }
   }
@@ -617,7 +617,7 @@ class AudioCubit extends Cubit<AudioState> {
           _isUserSeeking = false;
         });
       } catch (e) {
-        print('Error updating position: $e');
+        debugPrint('Error updating position: $e');
         _isUserSeeking = false;
       }
     }
@@ -642,7 +642,7 @@ class AudioCubit extends Cubit<AudioState> {
         emit(currentState.copyWith(currentPosition: position));
         await _audioPlayer.seek(position);
       } catch (e) {
-        print('Error ending user seek: $e');
+        debugPrint('Error ending user seek: $e');
       } finally {
         _isUserSeeking = false;
       }
@@ -692,7 +692,7 @@ class AudioCubit extends Cubit<AudioState> {
           _isUserSeeking = false;
         });
       } catch (e) {
-        print('Error seeking to position: $e');
+        debugPrint('Error seeking to position: $e');
         _isUserSeeking = false;
       }
     }
@@ -709,7 +709,7 @@ class AudioCubit extends Cubit<AudioState> {
         final currentState = state as AudioLoaded;
         emit(currentState.copyWith(playbackSpeed: clampedSpeed));
       } catch (e) {
-        print('Error setting playback speed: $e');
+        debugPrint('Error setting playback speed: $e');
       }
     }
   }
@@ -738,13 +738,13 @@ class AudioCubit extends Cubit<AudioState> {
 
   // Test method to debug audio issues
   Future<void> testAudioPlayback() async {
-    print('=== AUDIO PLAYBACK TEST ===');
+    debugPrint('=== AUDIO PLAYBACK TEST ===');
 
     try {
       // Test with a known working URL
       const testUrl =
           'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
-      print('Testing with known URL: $testUrl');
+      debugPrint('Testing with known URL: $testUrl');
 
       await _audioPlayer
           .play(UrlSource(testUrl))
@@ -758,13 +758,13 @@ class AudioCubit extends Cubit<AudioState> {
             },
           );
 
-      print('Test SUCCESS: Known URL played');
+      debugPrint('Test SUCCESS: Known URL played');
       await _audioPlayer.stop();
     } catch (e) {
-      print('Test FAILED: $e');
+      debugPrint('Test FAILED: $e');
     }
 
-    print('=== END AUDIO PLAYBACK TEST ===');
+    debugPrint('=== END AUDIO PLAYBACK TEST ===');
   }
 
   @override

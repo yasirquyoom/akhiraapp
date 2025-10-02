@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter/foundation.dart';
 
 class QuizQuestion extends Equatable {
   final String id;
@@ -157,7 +158,7 @@ class QuizCubit extends Cubit<QuizState> {
         emit(QuizInitial());
       }
     } catch (e) {
-      print('Error parsing quiz data: $e');
+      debugPrint('Error parsing quiz data: $e');
       emit(QuizInitial());
     }
   }
