@@ -153,14 +153,19 @@ class _HomePageState extends State<HomePage> {
                           const HeightSpacer(20),
                           // Content based on state
                           Expanded(
-                            child:
-                                state is HomeLoading
-                                    ? _buildLoadingState()
-                                    : state is HomeLoaded
-                                    ? _buildLibraryState(state.books)
-                                    : _lastBooks.isNotEmpty
-                                    ? _buildLibraryState(_lastBooks)
-                                    : _buildEmptyState(),
+                            child: RefreshIndicator(
+                              onRefresh: () async {
+                                // Force refresh from network
+                                context.read<HomeCubit>().loadCollections(forceRefresh: true);
+                              },
+                              child: state is HomeLoading
+                                  ? _buildLoadingState()
+                                  : state is HomeLoaded
+                                  ? _buildLibraryState(state.books, state.isFromCache)
+                                  : _lastBooks.isNotEmpty
+                                  ? _buildLibraryState(_lastBooks, false)
+                                  : _buildEmptyState(),
+                            ),
                           ),
                         ],
                       ),
@@ -308,10 +313,10 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildLibraryState(List<BookModel> books) {
+  Widget _buildLibraryState(List<BookModel> books, bool isFromCache) {
     return Column(
       children: [
-        // Library header with + button
+        // Library header with + button and refresh indicator
         Row(
           children: [
             Text(
@@ -324,6 +329,31 @@ class _HomePageState extends State<HomePage> {
                 color: Color(0xff0C1138),
               ),
             ),
+            if (isFromCache)
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.sync, size: 14, color: Colors.grey[700]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Refreshing...',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             const Spacer(),
             GestureDetector(
               onTap: _showAddBookDialog,

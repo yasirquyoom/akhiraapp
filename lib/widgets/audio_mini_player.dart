@@ -25,13 +25,14 @@ class AudioMiniPlayer extends StatelessWidget {
 
         final audioState = state;
 
-        return SafeArea(
-          top: false,
-          left: false,
-          right: false,
-          bottom: true,
+        return Container(
+          padding: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            top: 12,
+            bottom: MediaQuery.of(context).padding.bottom + 12,
+          ),
           child: Container(
-            margin: const EdgeInsets.all(12),
             height: 160,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
@@ -42,7 +43,7 @@ class AudioMiniPlayer extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-  color: Colors.black.withValues(alpha: 0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 15,
                   offset: const Offset(0, 8),
                 ),

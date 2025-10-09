@@ -37,8 +37,10 @@ class BookContentError extends BookContentState {
 class BookContentCubit extends Cubit<BookContentState> {
   final BookContentRepository _repository;
   final Map<String, BookContentData> _cachedContent = {};
+  final Map<String, Map<String, BookContentData>> _cachedContentByType = {};
   BookContentData? _allContentData;
   String? _currentBookId;
+  bool _isInitialLoad = true;
 
   BookContentCubit(this._repository) : super(BookContentInitial());
 
@@ -51,7 +53,11 @@ class BookContentCubit extends Cubit<BookContentState> {
       return;
     }
 
-    emit(BookContentLoading());
+    // Only emit loading state on initial load to prevent flickering
+    if (_isInitialLoad) {
+      emit(BookContentLoading());
+      _isInitialLoad = false;
+    }
 
     try {
       // Load all content without content_type filter
@@ -65,6 +71,11 @@ class BookContentCubit extends Cubit<BookContentState> {
       if (response.status == 200 && response.data != null) {
         _allContentData = response.data!;
         _currentBookId = bookId;
+        _cachedContent[bookId] = response.data!;
+        
+        // Cache content by type for faster access
+        _cacheContentByType(bookId, response.data!);
+        
         emit(BookContentLoaded(data: response.data!));
       } else {
         emit(BookContentError(message: response.message));
@@ -75,15 +86,43 @@ class BookContentCubit extends Cubit<BookContentState> {
     }
   }
 
+  // Cache content by type for faster tab switching
+  void _cacheContentByType(String bookId, BookContentData allData) {
+    if (!_cachedContentByType.containsKey(bookId)) {
+      _cachedContentByType[bookId] = {};
+    }
+    
+    // Group content by type
+    final contentTypes = ['ebook', 'audio', 'quiz', 'video', 'image'];
+    for (final type in contentTypes) {
+      _cachedContentByType[bookId]![type] = _filterContentByType(allData, type);
+    }
+  }
+
   Future<void> loadContentByType({
     required String bookId,
     required String contentType,
   }) async {
     if (isClosed) return;
 
+    // Check if we have this specific content type cached
+    if (_cachedContentByType.containsKey(bookId) && 
+        _cachedContentByType[bookId]!.containsKey(contentType)) {
+      // Use cached content immediately without loading state
+      emit(BookContentLoaded(data: _cachedContentByType[bookId]![contentType]!));
+      return;
+    }
+    
     // If we have all content cached, filter it immediately without loading state
     if (_allContentData != null && _currentBookId == bookId) {
       final filteredData = _filterContentByType(_allContentData!, contentType);
+      
+      // Cache the filtered data
+      if (!_cachedContentByType.containsKey(bookId)) {
+        _cachedContentByType[bookId] = {};
+      }
+      _cachedContentByType[bookId]![contentType] = filteredData;
+      
       emit(BookContentLoaded(data: filteredData));
       return;
     }

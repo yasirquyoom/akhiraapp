@@ -307,8 +307,9 @@ class _BookContentPageState extends State<BookContentPage>
       context.read<AudioCubit>().pauseTrack();
     }
 
-    // Filter content based on current tab
-    _filterContentForCurrentTab();
+    // Filter content based on current tab - use cached data
+    // This prevents empty screens during tab switching
+    _filterContentForCurrentTab(useCache: true);
   }
 
   void _loadAllBookContent() {
@@ -351,7 +352,7 @@ class _BookContentPageState extends State<BookContentPage>
     UrlLauncherService.openUrl(u);
   }
 
-  void _filterContentForCurrentTab() {
+  void _filterContentForCurrentTab({bool useCache = false}) {
     // Prefer widget parameter if provided, then fallback to global state
     final bookCubit = context.read<BookCubit>();
     String? bookId =
@@ -384,6 +385,9 @@ class _BookContentPageState extends State<BookContentPage>
     }
 
     debugPrint('Filtering content for bookId: $bookId, contentType: $contentType');
+    
+    // Use cached data to prevent empty screens during tab switching
+    // The BookContentCubit will handle returning cached data without API calls
     context.read<BookContentCubit>().loadContentByType(
       bookId: bookId,
       contentType: contentType ?? '',
@@ -1082,7 +1086,29 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (audioContents.isEmpty) {
-            return const SizedBox.shrink();
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.audiotrack, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No Audio Content Available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    "This book doesn't have any audio content",
+                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
 
           // Load audio data into AudioCubit only if not already loaded
@@ -1394,7 +1420,29 @@ class _BookContentPageState extends State<BookContentPage>
     return BlocBuilder<QuizCubit, QuizState>(
       builder: (context, state) {
         if (state is QuizLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.quiz_outlined, size: 64.sp, color: Colors.grey),
+                SizedBox(height: 16.h),
+                Text(
+                  'No Quiz Content Available',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  'If quizzes exist, they will appear shortly',
+                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
         } else if (state is QuizLoaded) {
           final completedByApi =
               state.remainingQuestions == 0 &&
@@ -1404,6 +1452,32 @@ class _BookContentPageState extends State<BookContentPage>
           }
           // Avoid RangeError if questions not yet loaded
           if (state.questions.isEmpty) {
+            // If API reports zero total questions, show empty-state instead of loader
+            if (state.totalQuestionsFromApi == 0) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.quiz_outlined, size: 64.sp, color: Colors.grey),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'No Quiz Content Available',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Text(
+                      "This book doesn't have any quiz questions",
+                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }
             return const Center(child: CircularProgressIndicator());
           }
           final allAnswered =
@@ -1445,7 +1519,29 @@ class _BookContentPageState extends State<BookContentPage>
           WidgetsBinding.instance.addPostFrameCallback((_) {
             context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
           });
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.quiz_outlined, size: 64.sp, color: Colors.grey),
+                SizedBox(height: 16.h),
+                Text(
+                  'No Quiz Content Available',
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  'If quizzes exist, they will appear shortly',
+                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
         }
       },
     );
@@ -2222,7 +2318,29 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (imageContents.isEmpty) {
-            return const SizedBox.shrink();
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.image, size: 64.sp, color: Colors.grey),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'No Image Content Available',
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    "This book doesn't have any image content",
+                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
           }
 
           return _buildImageCardStack(imageContents);
@@ -2818,25 +2936,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Builder(
-                      builder: (ctx) => IconButton(
-                      icon: Icon(Icons.share, color: Colors.white),
-                      onPressed: () {
-                        // Share PDF functionality (updated API)
-                        final box = ctx.findRenderObject() as RenderBox?;
-                        SharePlus.instance.share(
-                          ShareParams(
-                            uri: Uri.parse(widget.pdfUrl),
-                            title: widget.title,
-                            subject: widget.title,
-                            sharePositionOrigin: box != null
-                                ? (box.localToGlobal(Offset.zero) & box.size)
-                                : null,
-                          ),
-                        );
-                      },
-                      ),
-                    ),
+                    // Share button removed
                   ],
                 ),
               ),

@@ -17,11 +17,12 @@ class HomeEmpty extends HomeState {}
 
 class HomeLoaded extends HomeState {
   final List<BookModel> books;
+  final bool isFromCache;
 
-  const HomeLoaded({required this.books});
+  const HomeLoaded({required this.books, this.isFromCache = false});
 
   @override
-  List<Object?> get props => [books];
+  List<Object?> get props => [books, isFromCache];
 }
 
 class HomeError extends HomeState {
