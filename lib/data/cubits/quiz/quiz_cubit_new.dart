@@ -205,6 +205,7 @@ class QuizCubit extends Cubit<QuizState> {
         emit(
           QuizLoaded(
             questions: const [],
+            score: data['correct_answers'] ?? 0,
             totalAttempted: data['questions_attempted'] ?? 0,
             totalPossibleMarks: data['total_possible_marks'] ?? 0,
             marksEarned: data['marks_earned'] ?? 0,
@@ -423,6 +424,7 @@ class QuizCubit extends Cubit<QuizState> {
       final currentState = state as QuizLoaded;
       emit(
         currentState.copyWith(
+          score: data['correct_answers'] ?? currentState.score,
           totalAttempted:
               data['questions_attempted'] ?? currentState.totalAttempted,
           totalPossibleMarks:
@@ -449,6 +451,7 @@ class QuizCubit extends Cubit<QuizState> {
       final currentState = state as QuizLoaded;
       emit(
         currentState.copyWith(
+          score: data['correct_answers'] ?? currentState.score,
           totalAttempted:
               data['questions_attempted'] ?? currentState.totalAttempted,
           totalPossibleMarks:

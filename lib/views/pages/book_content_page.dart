@@ -1480,12 +1480,6 @@ class _BookContentPageState extends State<BookContentPage>
             }
             return const Center(child: CircularProgressIndicator());
           }
-          final allAnswered =
-              state.totalAttempted >= state.totalQuestions &&
-              state.totalQuestions > 0;
-          if (allAnswered) {
-            return _buildScoreCardOnly(state, bookId);
-          }
           return _buildQuizContent(state, bookId);
         } else if (state is QuizCompleted) {
           // We no longer use this visual path; defer to Loaded score card logic
@@ -1610,7 +1604,7 @@ class _BookContentPageState extends State<BookContentPage>
                       child: Column(
                         children: [
                           Text(
-                            '${state.totalAttempted}/${state.totalQuestions}',
+                            '${state.totalAttempted}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions}',
                             style: TextStyle(
                               fontFamily: 'SFPro',
                               fontWeight: FontWeight.w700,
@@ -1631,6 +1625,68 @@ class _BookContentPageState extends State<BookContentPage>
                 Text(
                   '${state.percentage.toStringAsFixed(2)}%',
                   style: TextStyle(color: Colors.white70),
+                ),
+                SizedBox(height: 16.h),
+                // Detailed metrics from API
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _languageManager.getText(
+                        'Total questions: ${state.totalQuestionsFromApi}',
+                        'Nombre total de questions: ${state.totalQuestionsFromApi}',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      _languageManager.getText(
+                        'Questions attempted: ${state.totalAttempted}',
+                        'Questions tentées: ${state.totalAttempted}',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      _languageManager.getText(
+                        'Correct answers: ${state.score}',
+                        'Bonnes réponses: ${state.score}',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      _languageManager.getText(
+                        'Total possible marks: ${state.totalPossibleMarks}',
+                        'Total des points possibles: ${state.totalPossibleMarks}',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      _languageManager.getText(
+                        'Marks earned: ${state.marksEarned}',
+                        'Points obtenus: ${state.marksEarned}',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      _languageManager.getText(
+                        'Percentage: ${state.percentage.toStringAsFixed(2)}%',
+                        'Pourcentage: ${state.percentage.toStringAsFixed(2)}%',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      _languageManager.getText(
+                        'Remaining questions: ${state.remainingQuestions}',
+                        'Questions restantes: ${state.remainingQuestions}',
+                      ),
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -1710,66 +1766,124 @@ class _BookContentPageState extends State<BookContentPage>
                   ),
                   borderRadius: BorderRadius.circular(16.r),
                 ),
-                child: Row(
+                child: Column(
                   children: [
-                    // Score
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            '${state.marksEarned}',
-                            style: TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 32.sp,
-                              color: Colors.white,
-                            ),
+                    Row(
+                      children: [
+                        // Score
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                '${state.marksEarned}',
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 32.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                _languageManager.getText('Marks', 'Points'),
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14.sp,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            _languageManager.getText('Marks', 'Points'),
-                            style: TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14.sp,
-                              color: Colors.white70,
-                            ),
+                        ),
+                        // Divider
+                        Container(
+                          width: 5,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10.r),
                           ),
-                        ],
-                      ),
+                        ),
+                        // Question Progress
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                '${state.totalAttempted}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions}',
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 32.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                _languageManager.getText('Attempted', 'Tentées'),
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14.sp,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                    // Divider
-                    Container(
-                      width: 5,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10.r),
-                      ),
-                    ),
-                    // Question Progress
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            '${state.totalAttempted}/${state.totalQuestions}',
-                            style: TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 32.sp,
-                              color: Colors.white,
-                            ),
+                    SizedBox(height: 12.h),
+                    // Additional live metrics
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                '${state.score}',
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 24.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                _languageManager.getText('Correct', 'Correctes'),
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12.sp,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
-                          Text(
-                            _languageManager.getText('Attempted', 'Tentées'),
-                            style: TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w500,
-                              fontSize: 14.sp,
-                              color: Colors.white70,
-                            ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                '${state.remainingQuestions}',
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 24.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                _languageManager.getText('Remaining', 'Restantes'),
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 12.sp,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
