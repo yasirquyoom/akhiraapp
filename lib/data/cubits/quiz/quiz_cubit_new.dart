@@ -218,17 +218,17 @@ class QuizCubit extends Cubit<QuizState> {
   }
 
   // Map our internal option key ('option1'..'option4') to the API payload format.
-  // Prefer sending letters 'A'..'D' as they are commonly accepted.
+  // Send option1, option2, etc. as requested by the API.
   String _mapOptionKeyToApiAnswer(String optionKey) {
     switch (optionKey.toLowerCase()) {
       case 'option1':
-        return 'A';
+        return 'option1';
       case 'option2':
-        return 'B';
+        return 'option2';
       case 'option3':
-        return 'C';
+        return 'option3';
       case 'option4':
-        return 'D';
+        return 'option4';
       default:
         return optionKey; // fallback: send as-is if unknown
     }
@@ -370,14 +370,21 @@ class QuizCubit extends Cubit<QuizState> {
       ),
     );
 
-    // Send to API, then refresh score
+    // Send to API, then refresh score and quiz data
     _repository
         .submitAnswer(
           quizId: currentState.currentQuestion.id,
-          // Convert 'option#' to API-expected format (letters)
+          // Send option1, option2, etc. as requested by the API
           userAnswer: _mapOptionKeyToApiAnswer(selected),
         )
-        .then((_) => _refreshScore())
+        .then((_) async {
+          // Refresh score first
+          await _refreshScore();
+          // Then refresh quiz data to get updated questions
+          if (_currentBookId != null) {
+            await loadQuizzesFromApi(bookId: _currentBookId!);
+          }
+        })
         .whenComplete(() {
           // Hide submitting loader
           final s = state;
@@ -423,10 +430,17 @@ class QuizCubit extends Cubit<QuizState> {
     _repository
         .submitAnswer(
           quizId: currentState.currentQuestion.id,
-          // Convert 'option#' to API-expected format (letters)
+          // Send option1, option2, etc. as requested by the API
           userAnswer: _mapOptionKeyToApiAnswer(selected),
         )
-        .then((_) => refreshBookScore(bookId))
+        .then((_) async {
+          // Refresh score first
+          await refreshBookScore(bookId);
+          // Then refresh quiz data to get updated questions
+          if (_currentBookId != null) {
+            await loadQuizzesFromApi(bookId: _currentBookId!);
+          }
+        })
         .whenComplete(() {
           // Advance question index if possible
           final s = state;
@@ -434,9 +448,10 @@ class QuizCubit extends Cubit<QuizState> {
             if (!s.isLastQuestion) {
               final nextQuestionIndex = s.currentQuestionIndex + 1;
               final nextQuestion = s.questions[nextQuestionIndex];
-              final existingAnswer = s.answers
-                  .where((a) => a.questionId == nextQuestion.id)
-                  .firstOrNull;
+              final existingAnswer =
+                  s.answers
+                      .where((a) => a.questionId == nextQuestion.id)
+                      .firstOrNull;
               emit(
                 s.copyWith(
                   currentQuestionIndex: nextQuestionIndex,

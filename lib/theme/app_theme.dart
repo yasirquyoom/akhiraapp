@@ -33,8 +33,8 @@ class AppTheme {
       filledButtonTheme: _filledButtonTheme(),
       chipTheme: base.chipTheme.copyWith(
         selectedColor: AppColors.tabActiveBg,
-  backgroundColor: AppColors.tabActiveBg.withValues(alpha: 0.25),
-  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
+        backgroundColor: AppColors.tabActiveBg.withValues(alpha: 0.25),
+        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.2)),
         labelStyle: TextStyle(color: AppColors.primary),
       ),
       dividerTheme: DividerThemeData(color: Colors.grey.shade200, space: 1),
@@ -51,7 +51,7 @@ class AppTheme {
       ),
       switchTheme: SwitchThemeData(
         trackColor: WidgetStateProperty.resolveWith(
-  (states) => AppColors.primary.withValues(alpha: 0.5),
+          (states) => AppColors.primary.withValues(alpha: 0.5),
         ),
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => AppColors.primary,
@@ -86,7 +86,7 @@ class AppTheme {
     );
   }
 
-  static InputDecorationTheme _inputTheme(InputDecorationTheme base) {
+  static InputDecorationThemeData _inputTheme(InputDecorationThemeData base) {
     return base.copyWith(
       filled: true,
       fillColor: Colors.grey.shade50,
