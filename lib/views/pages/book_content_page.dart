@@ -21,7 +21,10 @@ import '../../widgets/language_toggle.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import '../../services/pdf_cache_service.dart';
+import '../../services/audio_cache_service.dart';
+import '../../services/video_cache_service.dart';
 import '../../data/models/book_content.dart';
+import '../../data/models/book_content_response.dart';
 import '../../data/services/url_launcher_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -48,6 +51,16 @@ class _BookContentPageState extends State<BookContentPage>
   double _cachingProgress = 0.0;
   String? _cachedPdfPath;
   bool _isPdfCached = false;
+
+  // Track whether we've already shown empty state for a given content type
+  final Set<String> _emptyShownForType = {};
+  // Track prefetch completion per book to avoid duplicate work
+  final Set<String> _prefetchDoneForBook = {};
+
+  bool _hasShownEmpty(String type) => _emptyShownForType.contains(type);
+  void _markEmptyShown(String type) {
+    _emptyShownForType.add(type);
+  }
 
   @override
   void initState() {
@@ -567,19 +580,29 @@ class _BookContentPageState extends State<BookContentPage>
           ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          _refreshCurrentTabContent();
+      body: BlocListener<BookContentCubit, BookContentState>(
+        listener: (context, state) {
+          if (state is BookContentLoaded) {
+            // Warm caches in background when all content is available
+            _maybePrefetchForCurrentBook(state.data);
+            // Preload UI caches for instant tab switching
+            _backgroundPreloadUiCaches(state.data);
+          }
         },
-        child: TabBarView(
-          controller: _tabController,
-          children: [
-            _buildDigitalBookTab(),
-            _buildAudioTab(),
-            _buildQuizTab(),
-            _buildVideosTab(),
-            _buildImagesTab(),
-          ],
+        child: RefreshIndicator(
+          onRefresh: () async {
+            _refreshCurrentTabContent();
+          },
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildDigitalBookTab(),
+              _buildAudioTab(),
+              _buildQuizTab(),
+              _buildVideosTab(),
+              _buildImagesTab(),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar:
@@ -653,30 +676,35 @@ class _BookContentPageState extends State<BookContentPage>
 
           debugPrint('DEBUG: Digital Book Tab - ebook contents: ${allEbookContents.length}, pdf-only: ${pdfContents.length}');
 
-          if (pdfContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.picture_as_pdf, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No PDF Content Available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
+        if (pdfContents.isEmpty) {
+            if (!_hasShownEmpty('ebook')) {
+              _markEmptyShown('ebook');
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.picture_as_pdf, size: 64.sp, color: Colors.grey),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'No PDF Content Available',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    'This book doesn\'t have any PDF content',
-                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
+                    SizedBox(height: 8.h),
+                    Text(
+                      'This book doesn\'t have any PDF content',
+                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              return const SizedBox.shrink();
+            }
           }
 
           // Render PDF inline in this tab (first PDF)
@@ -720,6 +748,139 @@ class _BookContentPageState extends State<BookContentPage>
         return const Center(child: Text('No content available'));
       },
     );
+  }
+
+  // Background prefetch helpers
+  Future<void> _maybePrefetchForCurrentBook(BookContentData data) async {
+    if (!mounted) return;
+    // Avoid running on web since local file caching isn't supported
+    if (kIsWeb) return;
+    // Get the current book id to de-duplicate prefetch work
+    final bookCubit = context.read<BookCubit>();
+    final bookId = (widget.bookId != null && widget.bookId!.isNotEmpty)
+        ? widget.bookId
+        : bookCubit.getCurrentBookId();
+    if (bookId == null || bookId.isEmpty) return;
+    if (_prefetchDoneForBook.contains(bookId)) return;
+    _prefetchDoneForBook.add(bookId);
+
+    // Initialize caches
+    try {
+      await PdfCacheService.initialize();
+    } catch (_) {}
+    try {
+      await AudioCacheService.initialize();
+    } catch (_) {}
+    try {
+      await VideoCacheService.initialize();
+    } catch (_) {}
+
+    // Select a small subset of top items to warm caches
+    final contents = data.contents ?? [];
+    final ebooks = contents.where((c) => c.contentType == 'ebook').toList();
+    final audios = contents.where((c) => c.contentType == 'audio').toList();
+    final videos = contents.where((c) => c.contentType == 'video').toList();
+
+    // Pick up to 2 items per type to avoid heavy downloads
+    final topEbooks = ebooks.take(2).toList();
+    final topAudios = audios.take(2).toList();
+    final topVideos = videos.take(2).toList();
+
+    // Run prefetch asynchronously without blocking UI
+    Future(() async {
+      // PDFs
+      for (final e in topEbooks) {
+        final url = (e.fileUrl ?? '').toString();
+        if (url.isEmpty) continue;
+        final pdfUrl = _sanitizeUrl(url);
+        try {
+          final already = await PdfCacheService.isCached(pdfUrl);
+          if (!already) {
+            await PdfCacheService.cachePdf(pdfUrl).catchError((_) {});
+          }
+        } catch (_) {}
+      }
+    });
+
+    Future(() async {
+      // Audios
+      for (final a in topAudios) {
+        final url = (a.fileUrl ?? '').toString();
+        if (url.isEmpty) continue;
+        final audioUrl = _sanitizeUrl(url);
+        try {
+          final already = await AudioCacheService.isCached(audioUrl);
+          if (!already) {
+            await AudioCacheService.cacheAudio(audioUrl).catchError((_) {});
+          }
+        } catch (_) {}
+      }
+    });
+
+    Future(() async {
+      // Videos
+      for (final v in topVideos) {
+        final url = (v.fileUrl ?? '').toString();
+        if (url.isEmpty) continue;
+        final videoUrl = _sanitizeUrl(url);
+        try {
+          final already = await VideoCacheService.isCached(videoUrl);
+          if (!already) {
+            await VideoCacheService.cacheVideo(videoUrl).catchError((_) {});
+          }
+        } catch (_) {}
+      }
+    });
+  }
+
+  // Preload and cache API data for tabs to enable instant switching
+  void _backgroundPreloadUiCaches(BookContentData data) {
+    if (!mounted) return;
+    final contents = data.contents ?? [];
+
+    // 1) Audio: prepare tracks in AudioCubit so audio tab is instant
+    final audioContents = contents.where((c) => c.contentType == 'audio').toList();
+    if (audioContents.isNotEmpty) {
+      final audioCubit = context.read<AudioCubit>();
+      final audioState = audioCubit.state;
+      final shouldLoad = audioState is! AudioLoaded || (audioState as AudioLoaded?)?.tracks.isEmpty == true;
+      if (shouldLoad) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          audioCubit.loadAudioTracksFromApi(audioContents);
+        });
+      }
+    }
+
+    // 2) Images: precache thumbnails in memory for snappy display
+    final imageContents = contents.where((c) => c.contentType == 'image').toList();
+    if (imageContents.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Limit to a reasonable number to avoid memory pressure
+        final toPrefetch = imageContents.take(12).toList();
+        for (final img in toPrefetch) {
+          final url = _sanitizeUrl(img.fileUrl ?? '');
+          if (url.isNotEmpty) {
+            final provider = CachedNetworkImageProvider(url);
+            precacheImage(provider, context);
+          }
+        }
+      });
+    }
+
+    // 3) Videos: precache cover thumbnails if available
+    final videoContents = contents.where((c) => c.contentType == 'video').toList();
+    if (videoContents.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final toPrefetch = videoContents.take(8).toList();
+        for (final vid in toPrefetch) {
+          final cover = _sanitizeUrl((vid.coverImageUrl ?? '').toString());
+          if (cover.isNotEmpty) {
+            final provider = CachedNetworkImageProvider(cover);
+            precacheImage(provider, context);
+          }
+        }
+      });
+    }
   }
 
   // Deprecated ebook list/card helpers removed.
@@ -1086,29 +1247,34 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (audioContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.audiotrack, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No Audio Content Available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
+            if (!_hasShownEmpty('audio')) {
+              _markEmptyShown('audio');
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.audiotrack, size: 64.sp, color: Colors.grey),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'No Audio Content Available',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    "This book doesn't have any audio content",
-                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
+                    SizedBox(height: 8.h),
+                    Text(
+                      "This book doesn't have any audio content",
+                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              return const SizedBox.shrink();
+            }
           }
 
           // Load audio data into AudioCubit only if not already loaded
@@ -1444,39 +1610,51 @@ class _BookContentPageState extends State<BookContentPage>
             ),
           );
         } else if (state is QuizLoaded) {
+          final totalQuestions = state.totalQuestionsFromApi > 0
+              ? state.totalQuestionsFromApi
+              : state.totalQuestions;
+          final attempted = state.totalAttempted > 0
+              ? state.totalAttempted
+              : state.answers.length;
+          final completedByLocal = totalQuestions > 0 && attempted >= totalQuestions;
           final completedByApi =
               state.remainingQuestions == 0 &&
               (state.totalQuestionsFromApi > 0 || state.totalAttempted > 0);
-          if (completedByApi) {
+          if (completedByApi || completedByLocal) {
             return _buildScoreCardOnly(state, bookId);
           }
           // Avoid RangeError if questions not yet loaded
           if (state.questions.isEmpty) {
             // If API reports zero total questions, show empty-state instead of loader
             if (state.totalQuestionsFromApi == 0) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.quiz_outlined, size: 64.sp, color: Colors.grey),
-                    SizedBox(height: 16.h),
-                    Text(
-                      'No Quiz Content Available',
-                      style: TextStyle(
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
+              if (!_hasShownEmpty('quiz')) {
+                _markEmptyShown('quiz');
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.quiz_outlined, size: 64.sp, color: Colors.grey),
+                      SizedBox(height: 16.h),
+                      Text(
+                        'No Quiz Content Available',
+                        style: TextStyle(
+                          fontSize: 18.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
+                        ),
                       ),
-                    ),
-                    SizedBox(height: 8.h),
-                    Text(
-                      "This book doesn't have any quiz questions",
-                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              );
+                      SizedBox(height: 8.h),
+                      Text(
+                        "This book doesn't have any quiz questions",
+                        style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                return const SizedBox.shrink();
+              }
             }
             return const Center(child: CircularProgressIndicator());
           }
@@ -1604,7 +1782,7 @@ class _BookContentPageState extends State<BookContentPage>
                       child: Column(
                         children: [
                           Text(
-                            '${state.totalAttempted}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions}',
+                            '${(state.isSubmitting ? state.answers.length : (state.totalAttempted > 0 ? state.totalAttempted : state.answers.length))}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions}',
                             style: TextStyle(
                               fontFamily: 'SFPro',
                               fontWeight: FontWeight.w700,
@@ -1641,8 +1819,8 @@ class _BookContentPageState extends State<BookContentPage>
                     SizedBox(height: 6.h),
                     Text(
                       _languageManager.getText(
-                        'Questions attempted: ${state.totalAttempted}',
-                        'Questions tentées: ${state.totalAttempted}',
+                        'Questions attempted: ${(state.totalQuestionsFromApi > 0 ? state.totalAttempted : state.answers.length)}',
+                        'Questions tentées: ${(state.totalQuestionsFromApi > 0 ? state.totalAttempted : state.answers.length)}',
                       ),
                       style: TextStyle(color: Colors.white),
                     ),
@@ -1681,8 +1859,8 @@ class _BookContentPageState extends State<BookContentPage>
                     SizedBox(height: 6.h),
                     Text(
                       _languageManager.getText(
-                        'Remaining questions: ${state.remainingQuestions}',
-                        'Questions restantes: ${state.remainingQuestions}',
+                        'Remaining questions: ${(state.totalQuestionsFromApi > 0 ? state.remainingQuestions : math.max((state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions) - state.answers.length, 0))}',
+                        'Questions restantes: ${(state.totalQuestionsFromApi > 0 ? state.remainingQuestions : math.max((state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions) - state.answers.length, 0))}',
                       ),
                       style: TextStyle(color: Colors.white),
                     ),
@@ -1692,53 +1870,64 @@ class _BookContentPageState extends State<BookContentPage>
             ),
           ),
           SizedBox(height: 16.h),
-          SizedBox(
-            height: 48.h,
-            child: ElevatedButton(
-              onPressed:
-                  state.isResetting
-                      ? null
-                      : () =>
-                          context.read<QuizCubit>().resetBookAnswers(bookId),
-              style: ElevatedButton.styleFrom(
+          // Compute completion status to enable Reset only after finishing all questions
+          Builder(
+            builder: (context) {
+              final int totalFromApi = state.totalQuestionsFromApi;
+              final int total = totalFromApi > 0 ? totalFromApi : state.totalQuestions;
+              final int remaining = totalFromApi > 0
+                  ? state.remainingQuestions
+                  : math.max(total - state.answers.length, 0);
+              final bool isCompleted = total > 0 && remaining == 0;
+              return SizedBox(
+                height: 48.h,
+                child: ElevatedButton(
+                  onPressed:
+                      (state.isResetting || !isCompleted)
+                          ? null
+                          : () =>
+                              context.read<QuizCubit>().resetBookAnswers(bookId),
+                  style: ElevatedButton.styleFrom(
   disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.7),
-              ),
-              child:
-                  state.isResetting
-                      ? Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          SizedBox(
-                            width: 18.w,
-                            height: 18.w,
-                            child: const CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          ),
-                          SizedBox(width: 10.w),
-                          Text(
+                  ),
+                  child:
+                      state.isResetting
+                          ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 18.w,
+                                height: 18.w,
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(width: 10.w),
+                              Text(
+                                _languageManager.getText(
+                                  'Resetting...',
+                                  'Réinitialisation...',
+                                ),
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          )
+                          : Text(
                             _languageManager.getText(
-                              'Resetting...',
-                              'Réinitialisation...',
+                              'Reset Quiz',
+                              'Réinitialiser le quiz',
                             ),
-                            style: TextStyle(
-                              fontFamily: 'SFPro',
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16.sp,
-                              color: Colors.white,
-                            ),
+                            style: const TextStyle(color: Colors.white),
                           ),
-                        ],
-                      )
-                      : Text(
-                        _languageManager.getText(
-                          'Reset Quiz',
-                          'Réinitialiser le quiz',
-                        ),
-                        style: const TextStyle(color: Colors.white),
-                      ),
-            ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -1784,7 +1973,7 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Marks', 'Points'),
+                                _languageManager.getText('Marks Earned', 'Points obtenus'),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -1809,7 +1998,7 @@ class _BookContentPageState extends State<BookContentPage>
                           child: Column(
                             children: [
                               Text(
-                                '${state.totalAttempted}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions}',
+                                '${(state.totalQuestionsFromApi > 0 ? state.totalAttempted : state.answers.length)}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions}',
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w700,
@@ -1818,7 +2007,7 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Attempted', 'Tentées'),
+                                _languageManager.getText('Questions Attempted', 'Questions tentées'),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -1839,7 +2028,7 @@ class _BookContentPageState extends State<BookContentPage>
                           child: Column(
                             children: [
                               Text(
-                                '${state.score}',
+                                '${state.percentage.toStringAsFixed(0)}%',
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w700,
@@ -1848,7 +2037,7 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Correct', 'Correctes'),
+                                _languageManager.getText('Percentage', 'Pourcentage'),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -1863,7 +2052,7 @@ class _BookContentPageState extends State<BookContentPage>
                           child: Column(
                             children: [
                               Text(
-                                '${state.remainingQuestions}',
+                                '${state.totalQuestionsFromApi > 0 ? state.remainingQuestions : math.max((state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions) - state.answers.length, 0)}',
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w700,
@@ -1872,7 +2061,7 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Remaining', 'Restantes'),
+                                _languageManager.getText('Remaining Questions', 'Questions restantes'),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -2432,29 +2621,34 @@ class _BookContentPageState extends State<BookContentPage>
               [];
 
           if (imageContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.image, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No Image Content Available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
+            if (!_hasShownEmpty('image')) {
+              _markEmptyShown('image');
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.image, size: 64.sp, color: Colors.grey),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'No Image Content Available',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    "This book doesn't have any image content",
-                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
+                    SizedBox(height: 8.h),
+                    Text(
+                      "This book doesn't have any image content",
+                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              return const SizedBox.shrink();
+            }
           }
 
           return _buildImageCardStack(imageContents);

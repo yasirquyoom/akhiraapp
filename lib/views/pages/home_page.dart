@@ -38,6 +38,17 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _languageManager = LanguageManager();
     _languageManager.addListener(_onLanguageChanged);
+
+    // Ensure collections reload when arriving on HomePage (e.g., after navigating back)
+    // This avoids showing an empty library until app restart if previous state was stale.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        context.read<HomeCubit>().loadCollections(forceRefresh: true);
+      } catch (_) {
+        // Safely ignore if context/cubit is not available yet
+      }
+    });
   }
 
   @override

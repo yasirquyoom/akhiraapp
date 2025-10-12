@@ -191,6 +191,49 @@ class QuizCubit extends Cubit<QuizState> {
 
   QuizCubit(this._repository) : super(QuizInitial());
 
+  // Normalize various API representations (e.g., 'A', 'a', '1', 'option1')
+  // into the option key format we use in state: 'option1'..'option4'.
+  String _normalizeToOptionKey(String value) {
+    final v = value.trim().toLowerCase();
+    switch (v) {
+      case 'a':
+      case '1':
+      case 'option1':
+        return 'option1';
+      case 'b':
+      case '2':
+      case 'option2':
+        return 'option2';
+      case 'c':
+      case '3':
+      case 'option3':
+        return 'option3';
+      case 'd':
+      case '4':
+      case 'option4':
+        return 'option4';
+      default:
+        return value; // fallback to original if unknown
+    }
+  }
+
+  // Map our internal option key ('option1'..'option4') to the API payload format.
+  // Prefer sending letters 'A'..'D' as they are commonly accepted.
+  String _mapOptionKeyToApiAnswer(String optionKey) {
+    switch (optionKey.toLowerCase()) {
+      case 'option1':
+        return 'A';
+      case 'option2':
+        return 'B';
+      case 'option3':
+        return 'C';
+      case 'option4':
+        return 'D';
+      default:
+        return optionKey; // fallback: send as-is if unknown
+    }
+  }
+
   Future<void> loadQuizzesFromApi({required String bookId}) async {
     // Remember current book id to enable score refreshes after submit
     _currentBookId = bookId;
@@ -226,7 +269,8 @@ class QuizCubit extends Cubit<QuizState> {
             id: quiz.quizId,
             question: quiz.question,
             options: _parseQuizOptions(quiz),
-            correctAnswerId: quiz.correctOption,
+            // Normalize to 'option#' style to match our selectedOption ids
+            correctAnswerId: _normalizeToOptionKey(quiz.correctOption),
           );
           questions.add(question);
         }
@@ -321,7 +365,6 @@ class QuizCubit extends Cubit<QuizState> {
         score: optimisticAnswers.where((a) => a.isCorrect).length,
         // Optimistically update marks and attempts for immediate UI feedback
         marksEarned: currentState.marksEarned + (isCorrect ? 1 : 0),
-        totalAttempted: currentState.totalAttempted + 1,
         // Keep percentage/remainingQuestions driven by server to avoid mismatch
         isSubmitting: true,
       ),
@@ -331,7 +374,8 @@ class QuizCubit extends Cubit<QuizState> {
     _repository
         .submitAnswer(
           quizId: currentState.currentQuestion.id,
-          userAnswer: selected,
+          // Convert 'option#' to API-expected format (letters)
+          userAnswer: _mapOptionKeyToApiAnswer(selected),
         )
         .then((_) => _refreshScore())
         .whenComplete(() {
@@ -370,7 +414,6 @@ class QuizCubit extends Cubit<QuizState> {
         score: optimisticAnswers.where((a) => a.isCorrect).length,
         // Optimistically update marks and attempts for immediate UI feedback
         marksEarned: currentState.marksEarned + (isCorrect ? 1 : 0),
-        totalAttempted: currentState.totalAttempted + 1,
         // Keep percentage/remainingQuestions driven by server to avoid mismatch
         isSubmitting: true,
       ),
@@ -380,7 +423,8 @@ class QuizCubit extends Cubit<QuizState> {
     _repository
         .submitAnswer(
           quizId: currentState.currentQuestion.id,
-          userAnswer: selected,
+          // Convert 'option#' to API-expected format (letters)
+          userAnswer: _mapOptionKeyToApiAnswer(selected),
         )
         .then((_) => refreshBookScore(bookId))
         .whenComplete(() {
@@ -471,21 +515,38 @@ class QuizCubit extends Cubit<QuizState> {
   }
 
   Future<void> resetBookAnswers(String bookId) async {
+    // Remember current book id
+    _currentBookId = bookId;
+
+    // Show resetting loader
+    if (state is QuizLoaded) {
+      emit((state as QuizLoaded).copyWith(isResetting: true));
+    }
+
     try {
-      // Remember current book id
-      _currentBookId = bookId;
-      // Show resetting loader
-      if (state is QuizLoaded) {
-        emit((state as QuizLoaded).copyWith(isResetting: true));
-      }
+      // 1) Call reset API to clear current quiz data
       await _repository.resetAnswers(bookId: bookId);
-      // After reset, reload quizzes and score so the quiz appears again
+
+      // 2) Fetch updated quiz questions and 3) Retrieve latest score
+      //    Combined in loadQuizzesFromApi: it loads score first, then quizzes
       await loadQuizzesFromApi(bookId: bookId);
-    } catch (_) {
-    } finally {
-      if (state is QuizLoaded) {
-        emit((state as QuizLoaded).copyWith(isResetting: false));
+    } catch (e) {
+      // Handle API errors appropriately by surfacing an error state
+      final message = e.toString();
+      // Ensure loader is hidden before emitting error
+      final s = state;
+      if (s is QuizLoaded) {
+        emit(s.copyWith(isResetting: false));
       }
+      emit(QuizError(message: message));
+      return;
+    }
+
+    // 6) Maintain consistent state throughout the reset process
+    // Hide resetting loader when done
+    final s = state;
+    if (s is QuizLoaded) {
+      emit(s.copyWith(isResetting: false));
     }
   }
 
