@@ -56,6 +56,7 @@ class Quiz {
   final String correctOption;
   final int marks;
   final int quizNumber;
+  final bool isAttempted;
   final String createdAt;
   final String? updatedAt;
 
@@ -70,6 +71,7 @@ class Quiz {
     required this.correctOption,
     required this.marks,
     required this.quizNumber,
+    required this.isAttempted,
     required this.createdAt,
     this.updatedAt,
   });
@@ -86,6 +88,7 @@ class Quiz {
       correctOption: json['correct_option'] as String,
       marks: json['marks'] as int,
       quizNumber: json['quiz_number'] as int,
+      isAttempted: json['is_attempted'] as bool? ?? false,
       createdAt: json['created_at'] as String,
       updatedAt: json['updated_at'] as String?,
     );

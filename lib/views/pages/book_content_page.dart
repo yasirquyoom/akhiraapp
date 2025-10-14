@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'package:akhira/data/cubits/quiz/quiz_cubit_new.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -45,7 +45,7 @@ class _BookContentPageState extends State<BookContentPage>
   int _currentTabIndex = 0;
   late PdfViewerController _pdfViewerController;
   double _currentZoomLevel = 1.0;
-  
+
   // PDF caching variables
   bool _isPdfCaching = false;
   double _cachingProgress = 0.0;
@@ -78,7 +78,7 @@ class _BookContentPageState extends State<BookContentPage>
 
     // Load all book content initially
     _loadAllBookContent();
-    
+
     // Initialize PDF cache
     _initializePdfCache();
   }
@@ -141,7 +141,7 @@ class _BookContentPageState extends State<BookContentPage>
       return;
     }
     if (pdfUrl.isEmpty) return;
-    
+
     setState(() {
       _isPdfCaching = true;
       _cachingProgress = 0.0;
@@ -150,7 +150,7 @@ class _BookContentPageState extends State<BookContentPage>
     try {
       // Check if PDF is already cached
       final isCached = await PdfCacheService.isCached(pdfUrl);
-      
+
       if (isCached) {
         final cachedPath = await PdfCacheService.getCachedFilePath(pdfUrl);
         setState(() {
@@ -232,7 +232,9 @@ class _BookContentPageState extends State<BookContentPage>
         enableTextSelection: true,
         canShowPaginationDialog: true,
         onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-          debugPrint('Network PDF loaded (web): ${details.document.pages.count} pages');
+          debugPrint(
+            'Network PDF loaded (web): ${details.document.pages.count} pages',
+          );
         },
         onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
           debugPrint('Network PDF load failed (web): ${details.error}');
@@ -263,7 +265,9 @@ class _BookContentPageState extends State<BookContentPage>
         enableTextSelection: true,
         canShowPaginationDialog: true,
         onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-          debugPrint('Cached PDF loaded: ${details.document.pages.count} pages');
+          debugPrint(
+            'Cached PDF loaded: ${details.document.pages.count} pages',
+          );
         },
         onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
           debugPrint('Cached PDF load failed: ${details.error}');
@@ -286,7 +290,9 @@ class _BookContentPageState extends State<BookContentPage>
         enableTextSelection: true,
         canShowPaginationDialog: true,
         onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-          debugPrint('Network PDF loaded: ${details.document.pages.count} pages');
+          debugPrint(
+            'Network PDF loaded: ${details.document.pages.count} pages',
+          );
         },
         onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
           debugPrint('Network PDF load failed: ${details.error}');
@@ -350,13 +356,25 @@ class _BookContentPageState extends State<BookContentPage>
       debugPrint('Warning: Book ID is null or empty, cannot load content');
       return;
     }
-    
+
     debugPrint('Loading all content for bookId: $bookId');
     context.read<BookContentCubit>().loadAllBookContent(bookId: bookId);
 
     // Also ensure quiz APIs load for this book on page entry
     // (score first inside cubit, then quizzes)
-    context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+    // Only load if quiz is not already completed
+    final currentQuizState = context.read<QuizCubit>().state;
+    if (currentQuizState is QuizLoaded) {
+      final isCompleted =
+          currentQuizState.remainingQuestions == 0 &&
+          (currentQuizState.totalQuestionsFromApi > 0 ||
+              currentQuizState.totalAttempted > 0);
+      if (!isCompleted) {
+        context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+      }
+    } else {
+      context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+    }
   }
 
   void _openInNewTab(String url) {
@@ -397,8 +415,10 @@ class _BookContentPageState extends State<BookContentPage>
         break;
     }
 
-    debugPrint('Filtering content for bookId: $bookId, contentType: $contentType');
-    
+    debugPrint(
+      'Filtering content for bookId: $bookId, contentType: $contentType',
+    );
+
     // Use cached data to prevent empty screens during tab switching
     // The BookContentCubit will handle returning cached data without API calls
     context.read<BookContentCubit>().loadContentByType(
@@ -439,7 +459,9 @@ class _BookContentPageState extends State<BookContentPage>
         break;
     }
 
-    debugPrint('Refreshing content for bookId: $bookId, contentType: $contentType');
+    debugPrint(
+      'Refreshing content for bookId: $bookId, contentType: $contentType',
+    );
     context.read<BookContentCubit>().refreshContentByType(
       bookId: bookId,
       contentType: contentType ?? '',
@@ -660,23 +682,27 @@ class _BookContentPageState extends State<BookContentPage>
     return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
         debugPrint('DEBUG: Digital Book Tab - state: ${state.runtimeType}');
-        
+
         if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is BookContentLoaded) {
-          debugPrint('DEBUG: Digital Book Tab - loaded data: ${state.data.contents?.length} contents');
+          debugPrint(
+            'DEBUG: Digital Book Tab - loaded data: ${state.data.contents?.length} contents',
+          );
           // Filter to only 'ebook' content type and strictly PDFs
-          final allEbookContents = state.data.contents
+          final allEbookContents =
+              state.data.contents
                   ?.where((c) => c.contentType == 'ebook')
                   .toList() ??
               [];
-          final pdfContents = allEbookContents
-              .where((c) => _isPdfContent(c))
-              .toList();
+          final pdfContents =
+              allEbookContents.where((c) => _isPdfContent(c)).toList();
 
-          debugPrint('DEBUG: Digital Book Tab - ebook contents: ${allEbookContents.length}, pdf-only: ${pdfContents.length}');
+          debugPrint(
+            'DEBUG: Digital Book Tab - ebook contents: ${allEbookContents.length}, pdf-only: ${pdfContents.length}',
+          );
 
-        if (pdfContents.isEmpty) {
+          if (pdfContents.isEmpty) {
             if (!_hasShownEmpty('ebook')) {
               _markEmptyShown('ebook');
               return Center(
@@ -696,7 +722,10 @@ class _BookContentPageState extends State<BookContentPage>
                     SizedBox(height: 8.h),
                     Text(
                       'This book doesn\'t have any PDF content',
-                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[600],
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -709,7 +738,9 @@ class _BookContentPageState extends State<BookContentPage>
 
           // Render PDF inline in this tab (first PDF)
           final ebook = pdfContents.first;
-          debugPrint('DEBUG: Digital Book Tab - rendering PDF: ${ebook.title}, URL: ${ebook.fileUrl}');
+          debugPrint(
+            'DEBUG: Digital Book Tab - rendering PDF: ${ebook.title}, URL: ${ebook.fileUrl}',
+          );
           return _buildInlinePdfViewer(
             title: ebook.title,
             pdfUrl: ebook.fileUrl,
@@ -757,9 +788,10 @@ class _BookContentPageState extends State<BookContentPage>
     if (kIsWeb) return;
     // Get the current book id to de-duplicate prefetch work
     final bookCubit = context.read<BookCubit>();
-    final bookId = (widget.bookId != null && widget.bookId!.isNotEmpty)
-        ? widget.bookId
-        : bookCubit.getCurrentBookId();
+    final bookId =
+        (widget.bookId != null && widget.bookId!.isNotEmpty)
+            ? widget.bookId
+            : bookCubit.getCurrentBookId();
     if (bookId == null || bookId.isEmpty) return;
     if (_prefetchDoneForBook.contains(bookId)) return;
     _prefetchDoneForBook.add(bookId);
@@ -839,11 +871,14 @@ class _BookContentPageState extends State<BookContentPage>
     final contents = data.contents ?? [];
 
     // 1) Audio: prepare tracks in AudioCubit so audio tab is instant
-    final audioContents = contents.where((c) => c.contentType == 'audio').toList();
+    final audioContents =
+        contents.where((c) => c.contentType == 'audio').toList();
     if (audioContents.isNotEmpty) {
       final audioCubit = context.read<AudioCubit>();
       final audioState = audioCubit.state;
-      final shouldLoad = audioState is! AudioLoaded || (audioState as AudioLoaded?)?.tracks.isEmpty == true;
+      final shouldLoad =
+          audioState is! AudioLoaded ||
+          (audioState as AudioLoaded?)?.tracks.isEmpty == true;
       if (shouldLoad) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           audioCubit.loadAudioTracksFromApi(audioContents);
@@ -852,7 +887,8 @@ class _BookContentPageState extends State<BookContentPage>
     }
 
     // 2) Images: precache thumbnails in memory for snappy display
-    final imageContents = contents.where((c) => c.contentType == 'image').toList();
+    final imageContents =
+        contents.where((c) => c.contentType == 'image').toList();
     if (imageContents.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // Limit to a reasonable number to avoid memory pressure
@@ -868,7 +904,8 @@ class _BookContentPageState extends State<BookContentPage>
     }
 
     // 3) Videos: precache cover thumbnails if available
-    final videoContents = contents.where((c) => c.contentType == 'video').toList();
+    final videoContents =
+        contents.where((c) => c.contentType == 'video').toList();
     if (videoContents.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final toPrefetch = videoContents.take(8).toList();
@@ -913,7 +950,7 @@ class _BookContentPageState extends State<BookContentPage>
             ),
             boxShadow: [
               BoxShadow(
-  color: Colors.black.withValues(alpha: 0.05),
+                color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 4,
                 offset: Offset(0, 2),
               ),
@@ -926,10 +963,16 @@ class _BookContentPageState extends State<BookContentPage>
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                   decoration: BoxDecoration(
-  color: _isPdfCached ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
+                    color:
+                        _isPdfCached
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8.r),
                     border: Border.all(
-  color: _isPdfCached ? Colors.green.withValues(alpha: 0.3) : Colors.orange.withValues(alpha: 0.3),
+                      color:
+                          _isPdfCached
+                              ? Colors.green.withValues(alpha: 0.3)
+                              : Colors.orange.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -941,7 +984,9 @@ class _BookContentPageState extends State<BookContentPage>
                           height: 12.h,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.orange,
+                            ),
                             value: _cachingProgress,
                           ),
                         )
@@ -963,29 +1008,30 @@ class _BookContentPageState extends State<BookContentPage>
                     ],
                   ),
                 ),
-              
+
               if (_isPdfCaching || _isPdfCached) SizedBox(width: 12.w),
-              
+
               // Zoom level display with enhanced styling
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-  colors: [AppColors.primary.withValues(alpha: 0.1), Colors.white],
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.1),
+                      Colors.white,
+                    ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   borderRadius: BorderRadius.circular(12.r),
-  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.zoom_in,
-                      size: 14.sp,
-                      color: AppColors.primary,
-                    ),
+                    Icon(Icons.zoom_in, size: 14.sp, color: AppColors.primary),
                     SizedBox(width: 4.w),
                     Text(
                       _getZoomPercentage(),
@@ -999,7 +1045,7 @@ class _BookContentPageState extends State<BookContentPage>
                 ),
               ),
               SizedBox(width: 16.w),
-              
+
               // Zoom controls with better styling
               Container(
                 decoration: BoxDecoration(
@@ -1007,7 +1053,7 @@ class _BookContentPageState extends State<BookContentPage>
                   borderRadius: BorderRadius.circular(20.r),
                   boxShadow: [
                     BoxShadow(
-  color: Colors.black.withValues(alpha: 0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 8,
                       offset: Offset(0, 2),
                     ),
@@ -1026,17 +1072,16 @@ class _BookContentPageState extends State<BookContentPage>
                           padding: EdgeInsets.all(10.w),
                           child: Icon(
                             Icons.remove,
-                            color: _currentZoomLevel > 0.5 ? AppColors.primary : Colors.grey,
+                            color:
+                                _currentZoomLevel > 0.5
+                                    ? AppColors.primary
+                                    : Colors.grey,
                             size: 18.sp,
                           ),
                         ),
                       ),
                     ),
-                    Container(
-                      width: 1,
-                      height: 20.h,
-                      color: Colors.grey[300],
-                    ),
+                    Container(width: 1, height: 20.h, color: Colors.grey[300]),
                     // Reset zoom button
                     Material(
                       color: Colors.transparent,
@@ -1047,17 +1092,16 @@ class _BookContentPageState extends State<BookContentPage>
                           padding: EdgeInsets.all(10.w),
                           child: Icon(
                             Icons.refresh,
-                            color: _currentZoomLevel != 1.0 ? AppColors.primary : Colors.grey,
+                            color:
+                                _currentZoomLevel != 1.0
+                                    ? AppColors.primary
+                                    : Colors.grey,
                             size: 18.sp,
                           ),
                         ),
                       ),
                     ),
-                    Container(
-                      width: 1,
-                      height: 20.h,
-                      color: Colors.grey[300],
-                    ),
+                    Container(width: 1, height: 20.h, color: Colors.grey[300]),
                     // Zoom in button
                     Material(
                       color: Colors.transparent,
@@ -1068,7 +1112,10 @@ class _BookContentPageState extends State<BookContentPage>
                           padding: EdgeInsets.all(10.w),
                           child: Icon(
                             Icons.add,
-                            color: _currentZoomLevel < 3.0 ? AppColors.primary : Colors.grey,
+                            color:
+                                _currentZoomLevel < 3.0
+                                    ? AppColors.primary
+                                    : Colors.grey,
                             size: 18.sp,
                           ),
                         ),
@@ -1077,15 +1124,18 @@ class _BookContentPageState extends State<BookContentPage>
                   ],
                 ),
               ),
-              
+
               const Spacer(),
-              
+
               // PDF title with better styling
               Expanded(
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 12.w,
+                    vertical: 6.h,
+                  ),
                   decoration: BoxDecoration(
-  color: Colors.white.withValues(alpha: 0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                   child: Text(
@@ -1100,9 +1150,9 @@ class _BookContentPageState extends State<BookContentPage>
                   ),
                 ),
               ),
-              
+
               SizedBox(width: 16.w),
-              
+
               // Fullscreen button
               Material(
                 color: Colors.transparent,
@@ -1112,7 +1162,7 @@ class _BookContentPageState extends State<BookContentPage>
                   child: Container(
                     padding: EdgeInsets.all(10.w),
                     decoration: BoxDecoration(
-  color: AppColors.primary.withValues(alpha: 0.1),
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20.r),
                     ),
                     child: Icon(
@@ -1126,7 +1176,7 @@ class _BookContentPageState extends State<BookContentPage>
             ],
           ),
         ),
-        
+
         // Enhanced PDF viewer with gesture detection
         Expanded(
           child: GestureDetector(
@@ -1135,7 +1185,10 @@ class _BookContentPageState extends State<BookContentPage>
             },
             onScaleUpdate: (details) {
               if (details.scale != 1.0) {
-                final newZoomLevel = (_currentZoomLevel * details.scale).clamp(0.5, 3.0);
+                final newZoomLevel = (_currentZoomLevel * details.scale).clamp(
+                  0.5,
+                  3.0,
+                );
                 if (newZoomLevel != _currentZoomLevel) {
                   setState(() {
                     _currentZoomLevel = newZoomLevel;
@@ -1149,7 +1202,7 @@ class _BookContentPageState extends State<BookContentPage>
                 color: Colors.grey[100],
                 boxShadow: [
                   BoxShadow(
-  color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: Offset(0, -2),
                   ),
@@ -1171,7 +1224,8 @@ class _BookContentPageState extends State<BookContentPage>
     // Remove stray backticks if present from API formatting
     u = u.replaceAll('`', '');
     // Strip surrounding quotes if present
-    if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) {
+    if ((u.startsWith('"') && u.endsWith('"')) ||
+        (u.startsWith("'") && u.endsWith("'"))) {
       u = u.substring(1, u.length - 1);
     }
     // Remove any embedded quotes
@@ -1183,11 +1237,12 @@ class _BookContentPageState extends State<BookContentPage>
     final effectivePdfUrl = _getPdfSource(pdfUrl);
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => _FullscreenPdfViewer(
-          title: title,
-          pdfUrl: effectivePdfUrl,
-          isFromCache: !kIsWeb && _isPdfCached,
-        ),
+        builder:
+            (context) => _FullscreenPdfViewer(
+              title: title,
+              pdfUrl: effectivePdfUrl,
+              isFromCache: !kIsWeb && _isPdfCached,
+            ),
       ),
     );
   }
@@ -1266,7 +1321,10 @@ class _BookContentPageState extends State<BookContentPage>
                     SizedBox(height: 8.h),
                     Text(
                       "This book doesn't have any audio content",
-                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[600],
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -1317,7 +1375,7 @@ class _BookContentPageState extends State<BookContentPage>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-  color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1393,10 +1451,11 @@ class _BookContentPageState extends State<BookContentPage>
                 duration: '0:00', // We don't have duration from API
                 audioUrl: audio.fileUrl ?? '',
                 // Prefer coverImageUrl if available for dynamic artwork
-                thumbnailUrl: (audio.coverImageUrl != null &&
-                        (audio.coverImageUrl as String).isNotEmpty)
-                    ? (audio.coverImageUrl as String)
-                    : '',
+                thumbnailUrl:
+                    (audio.coverImageUrl != null &&
+                            (audio.coverImageUrl as String).isNotEmpty)
+                        ? (audio.coverImageUrl as String)
+                        : '',
               );
 
               // Start playing the audio track
@@ -1436,7 +1495,7 @@ class _BookContentPageState extends State<BookContentPage>
           ),
           boxShadow: [
             BoxShadow(
-  color: Colors.black.withValues(alpha: 0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -1459,7 +1518,7 @@ class _BookContentPageState extends State<BookContentPage>
                           fit: BoxFit.cover,
                           errorBuilder:
                               (_, __, ___) => Container(
-  color: Colors.white.withValues(alpha: 0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 child: const Icon(
                                   Icons.audiotrack,
                                   color: Colors.white,
@@ -1467,7 +1526,7 @@ class _BookContentPageState extends State<BookContentPage>
                               ),
                         )
                         : Container(
-  color: Colors.white.withValues(alpha: 0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           child: const Icon(
                             Icons.audiotrack,
                             color: Colors.white,
@@ -1544,6 +1603,24 @@ class _BookContentPageState extends State<BookContentPage>
     );
   }
 
+  bool _isCurrentQuestionUnattempted(QuizLoaded state) {
+    // Check if current question is already attempted using the is_attempted field from API
+    final currentQuestionId = state.currentQuestion.id;
+
+    // Find the original quiz data for the current question
+    final originalQuiz = state.originalQuizzes.firstWhere(
+      (quiz) => quiz.quizId == currentQuestionId,
+      orElse:
+          () =>
+              throw Exception(
+                'Quiz not found for question: $currentQuestionId',
+              ),
+    );
+
+    // Use the is_attempted field from the API response
+    return !originalQuiz.isAttempted;
+  }
+
   Widget _buildQuizTab() {
     // Prefer widget parameter if provided, then fallback to global state
     final bookCubit = context.read<BookCubit>();
@@ -1610,19 +1687,33 @@ class _BookContentPageState extends State<BookContentPage>
             ),
           );
         } else if (state is QuizLoaded) {
-          final totalQuestions = state.totalQuestionsFromApi > 0
-              ? state.totalQuestionsFromApi
-              : state.totalQuestions;
-          final attempted = state.totalAttempted > 0
-              ? state.totalAttempted
-              : state.answers.length;
-          final completedByLocal = totalQuestions > 0 && attempted >= totalQuestions;
+          final totalQuestions =
+              state.totalQuestionsFromApi > 0
+                  ? state.totalQuestionsFromApi
+                  : state.totalQuestions;
+          final attempted =
+              state.totalAttempted > 0
+                  ? state.totalAttempted
+                  : state.answers.length;
+          final completedByLocal =
+              totalQuestions > 0 && attempted >= totalQuestions;
           final completedByApi =
               state.remainingQuestions == 0 &&
               (state.totalQuestionsFromApi > 0 || state.totalAttempted > 0);
+
+          // Debug: Print state values to understand what's happening
+          print(
+            'UI State Debug: remainingQuestions=${state.remainingQuestions}, totalQuestionsFromApi=${state.totalQuestionsFromApi}, totalAttempted=${state.totalAttempted}, questions.length=${state.questions.length}',
+          );
+          print(
+            'UI Completion Check: completedByApi=$completedByApi, completedByLocal=$completedByLocal',
+          );
+
+          // Check completion first, before checking if questions are empty
           if (completedByApi || completedByLocal) {
             return _buildScoreCardOnly(state, bookId);
           }
+
           // Avoid RangeError if questions not yet loaded
           if (state.questions.isEmpty) {
             // If API reports zero total questions, show empty-state instead of loader
@@ -1633,7 +1724,11 @@ class _BookContentPageState extends State<BookContentPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.quiz_outlined, size: 64.sp, color: Colors.grey),
+                      Icon(
+                        Icons.quiz_outlined,
+                        size: 64.sp,
+                        color: Colors.grey,
+                      ),
                       SizedBox(height: 16.h),
                       Text(
                         'No Quiz Content Available',
@@ -1646,7 +1741,10 @@ class _BookContentPageState extends State<BookContentPage>
                       SizedBox(height: 8.h),
                       Text(
                         "This book doesn't have any quiz questions",
-                        style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          color: Colors.grey[600],
+                        ),
                         textAlign: TextAlign.center,
                       ),
                     ],
@@ -1687,9 +1785,21 @@ class _BookContentPageState extends State<BookContentPage>
             ),
           );
         } else {
-          // QuizInitial state - load quizzes
+          // QuizInitial state - load quizzes only if not already completed
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+            // Check if quiz is already completed before loading
+            final currentState = context.read<QuizCubit>().state;
+            if (currentState is QuizLoaded) {
+              final isCompleted =
+                  currentState.remainingQuestions == 0 &&
+                  (currentState.totalQuestionsFromApi > 0 ||
+                      currentState.totalAttempted > 0);
+              if (!isCompleted) {
+                context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+              }
+            } else {
+              context.read<QuizCubit>().loadQuizzesFromApi(bookId: bookId);
+            }
           });
           return Center(
             child: Column(
@@ -1874,10 +1984,12 @@ class _BookContentPageState extends State<BookContentPage>
           Builder(
             builder: (context) {
               final int totalFromApi = state.totalQuestionsFromApi;
-              final int total = totalFromApi > 0 ? totalFromApi : state.totalQuestions;
-              final int remaining = totalFromApi > 0
-                  ? state.remainingQuestions
-                  : math.max(total - state.answers.length, 0);
+              final int total =
+                  totalFromApi > 0 ? totalFromApi : state.totalQuestions;
+              final int remaining =
+                  totalFromApi > 0
+                      ? state.remainingQuestions
+                      : math.max(total - state.answers.length, 0);
               final bool isCompleted = total > 0 && remaining == 0;
               return SizedBox(
                 height: 48.h,
@@ -1885,10 +1997,13 @@ class _BookContentPageState extends State<BookContentPage>
                   onPressed:
                       (state.isResetting || !isCompleted)
                           ? null
-                          : () =>
-                              context.read<QuizCubit>().resetBookAnswers(bookId),
+                          : () => context.read<QuizCubit>().resetBookAnswers(
+                            bookId,
+                          ),
                   style: ElevatedButton.styleFrom(
-  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.7),
+                    disabledBackgroundColor: AppColors.primary.withValues(
+                      alpha: 0.7,
+                    ),
                   ),
                   child:
                       state.isResetting
@@ -1943,6 +2058,12 @@ class _BookContentPageState extends State<BookContentPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              GestureDetector(
+                onTap: () {
+                  context.read<QuizCubit>().resetBookAnswers(bookId);
+                },
+                child: Icon(Icons.reset_tv),
+              ),
               // Score and Progress Card
               Container(
                 width: double.infinity,
@@ -1973,7 +2094,10 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Marks Earned', 'Points obtenus'),
+                                _languageManager.getText(
+                                  'Marks Earned',
+                                  'Points obtenus',
+                                ),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -1998,7 +2122,7 @@ class _BookContentPageState extends State<BookContentPage>
                           child: Column(
                             children: [
                               Text(
-                                '${(state.totalQuestionsFromApi > 0 ? state.totalAttempted : state.answers.length)}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions}',
+                                '${state.currentQuestionIndex + 1}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.questions.length}',
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w700,
@@ -2007,7 +2131,10 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Questions Attempted', 'Questions tentées'),
+                                _languageManager.getText(
+                                  'Current Question',
+                                  'Question actuelle',
+                                ),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -2037,7 +2164,10 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Percentage', 'Pourcentage'),
+                                _languageManager.getText(
+                                  'Percentage',
+                                  'Pourcentage',
+                                ),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -2052,7 +2182,7 @@ class _BookContentPageState extends State<BookContentPage>
                           child: Column(
                             children: [
                               Text(
-                                '${state.totalQuestionsFromApi > 0 ? state.remainingQuestions : math.max((state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.totalQuestions) - state.answers.length, 0)}',
+                                '${state.remainingQuestions}',
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w700,
@@ -2061,7 +2191,10 @@ class _BookContentPageState extends State<BookContentPage>
                                 ),
                               ),
                               Text(
-                                _languageManager.getText('Remaining Questions', 'Questions restantes'),
+                                _languageManager.getText(
+                                  'Remaining Questions',
+                                  'Questions restantes',
+                                ),
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w500,
@@ -2103,122 +2236,172 @@ class _BookContentPageState extends State<BookContentPage>
 
               SizedBox(height: 24.h),
 
-              // Navigation Buttons Row
-              Row(
-                children: [
-                  // Back Button (only show for questions 2-5)
-                  if (!state.isFirstQuestion) ...[
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed:
-                            () => context.read<QuizCubit>().previousQuestion(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.grey.shade100,
-                          foregroundColor: Colors.grey.shade700,
-                          padding: EdgeInsets.symmetric(vertical: 16.h),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12.r),
-                            side: BorderSide(color: Colors.grey.shade300),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _languageManager.getText('Back', 'Retour'),
-                              style: TextStyle(
-                                fontFamily: 'SFPro',
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16.sp,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 16.w),
-                  ],
+              // // Navigation and Submit Buttons
+              // Row(
+              //   children: [
+              //     // Previous Button
+              //     Expanded(
+              //       child: ElevatedButton(
+              //         onPressed:
+              //             state.currentQuestionIndex > 0 && !state.isSubmitting
+              //                 ? () {
+              //                   context.read<QuizCubit>().previousQuestion();
+              //                 }
+              //                 : null,
+              //         style: ElevatedButton.styleFrom(
+              //           backgroundColor:
+              //               state.currentQuestionIndex > 0 &&
+              //                       !state.isSubmitting
+              //                   ? Colors.grey.shade600
+              //                   : Colors.grey.shade300,
+              //           padding: EdgeInsets.symmetric(vertical: 16.h),
+              //           shape: RoundedRectangleBorder(
+              //             borderRadius: BorderRadius.circular(12.r),
+              //           ),
+              //           elevation: 0,
+              //         ),
+              //         child: Text(
+              //           _languageManager.getText('Previous', 'Précédent'),
+              //           style: TextStyle(
+              //             fontFamily: 'SFPro',
+              //             fontWeight: FontWeight.w600,
+              //             fontSize: 16.sp,
+              //             color:
+              //                 state.currentQuestionIndex > 0 &&
+              //                         !state.isSubmitting
+              //                     ? Colors.white
+              //                     : Colors.grey.shade600,
+              //           ),
+              //         ),
+              //       ),
+              //     ),
+              //     SizedBox(width: 16.w),
+              //     // Next Button
+              //     Expanded(
+              //       child: ElevatedButton(
+              //         onPressed:
+              //             state.currentQuestionIndex <
+              //                         (state.totalQuestionsFromApi > 0
+              //                                 ? state.totalQuestionsFromApi
+              //                                 : state.questions.length) -
+              //                             1 &&
+              //                     !state.isSubmitting
+              //                 ? () {
+              //                   context.read<QuizCubit>().nextQuestion();
+              //                 }
+              //                 : null,
+              //         style: ElevatedButton.styleFrom(
+              //           backgroundColor:
+              //               state.currentQuestionIndex <
+              //                           (state.totalQuestionsFromApi > 0
+              //                                   ? state.totalQuestionsFromApi
+              //                                   : state.questions.length) -
+              //                               1 &&
+              //                       !state.isSubmitting
+              //                   ? Colors.grey.shade600
+              //                   : Colors.grey.shade300,
+              //           padding: EdgeInsets.symmetric(vertical: 16.h),
+              //           shape: RoundedRectangleBorder(
+              //             borderRadius: BorderRadius.circular(12.r),
+              //           ),
+              //           elevation: 0,
+              //         ),
+              //         child: Text(
+              //           _languageManager.getText('Next', 'Suivant'),
+              //           style: TextStyle(
+              //             fontFamily: 'SFPro',
+              //             fontWeight: FontWeight.w600,
+              //             fontSize: 16.sp,
+              //             color:
+              //                 state.currentQuestionIndex <
+              //                             (state.totalQuestionsFromApi > 0
+              //                                     ? state.totalQuestionsFromApi
+              //                                     : state.questions.length) -
+              //                                 1 &&
+              //                         !state.isSubmitting
+              //                     ? Colors.white
+              //                     : Colors.grey.shade600,
+              //           ),
+              //         ),
+              //       ),
+              //     ),
+              //   ],
+              // ),
+              // SizedBox(height: 16.h),
 
-                  // Next/Submit Button
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed:
-                          state.selectedOptionId != null && !state.isSubmitting
-                              ? () {
-                                context
-                                    .read<QuizCubit>()
-                                    .submitAndAdvance(bookId: bookId);
-                              }
-                              : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            state.selectedOptionId != null &&
-                                    !state.isSubmitting
-                                ? AppColors.primary
-                                : Colors.grey.shade300,
-                        padding: EdgeInsets.symmetric(vertical: 16.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        elevation: 0,
-                      ),
-                      child:
-                          state.isSubmitting
-                              ? Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 18.w,
-                                    height: 18.w,
-                                    child: const CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  SizedBox(width: 10.w),
-                                  Text(
-                                    _languageManager.getText(
-                                      'Submitting...',
-                                      'Envoi...',
-                                    ),
-                                    style: TextStyle(
-                                      fontFamily: 'SFPro',
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16.sp,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              )
-                              : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    state.isLastQuestion
-                                        ? _languageManager.getText(
-                                          'Submit',
-                                          'Envoyer',
-                                        )
-                                        : _languageManager.getText(
-                                          'Next',
-                                          'Suivant',
-                                        ),
-                                    style: TextStyle(
-                                      fontFamily: 'SFPro',
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16.sp,
-                                      color:
-                                          state.selectedOptionId != null
-                                              ? Colors.white
-                                              : Colors.grey.shade600,
-                                    ),
-                                  ),
-                                ],
-                              ),
+              // Submit Button (Full Width)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed:
+                      state.selectedOptionId != null &&
+                              !state.isSubmitting &&
+                              _isCurrentQuestionUnattempted(state)
+                          ? () {
+                            context.read<QuizCubit>().submitAndAdvance(
+                              bookId: bookId,
+                            );
+                          }
+                          : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        state.selectedOptionId != null && !state.isSubmitting
+                            ? AppColors.primary
+                            : Colors.grey.shade300,
+                    padding: EdgeInsets.symmetric(vertical: 16.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
                     ),
+                    elevation: 0,
                   ),
-                ],
+                  child:
+                      state.isSubmitting
+                          ? Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 18.w,
+                                height: 18.w,
+                                child: const CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(width: 10.w),
+                              Text(
+                                _languageManager.getText(
+                                  'Submitting...',
+                                  'Envoi...',
+                                ),
+                                style: TextStyle(
+                                  fontFamily: 'SFPro',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          )
+                          : Text(
+                            _languageManager.getText(
+                              _isCurrentQuestionUnattempted(state)
+                                  ? 'Submit Answer'
+                                  : 'Already Answered',
+                              _isCurrentQuestionUnattempted(state)
+                                  ? 'Soumettre la réponse'
+                                  : 'Déjà répondu',
+                            ),
+                            style: TextStyle(
+                              fontFamily: 'SFPro',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16.sp,
+                              color:
+                                  state.selectedOptionId != null
+                                      ? Colors.white
+                                      : Colors.grey.shade600,
+                            ),
+                          ),
+                ),
               ),
             ],
           ),
@@ -2340,20 +2523,24 @@ class _BookContentPageState extends State<BookContentPage>
     return BlocBuilder<BookContentCubit, BookContentState>(
       builder: (context, state) {
         debugPrint('DEBUG: Videos Tab - state: ${state.runtimeType}');
-        
+
         if (state is BookContentLoading) {
           return const Center(child: CircularProgressIndicator());
         } else if (state is BookContentLoaded) {
-          debugPrint('DEBUG: Videos Tab - loaded data: ${state.data.contents?.length} contents');
-          
+          debugPrint(
+            'DEBUG: Videos Tab - loaded data: ${state.data.contents?.length} contents',
+          );
+
           final videoContents =
               state.data.contents
                   ?.where((content) => content.contentType == 'video')
                   .toList() ??
               [];
 
-          debugPrint('DEBUG: Videos Tab - video contents: ${videoContents.length}');
-          
+          debugPrint(
+            'DEBUG: Videos Tab - video contents: ${videoContents.length}',
+          );
+
           if (videoContents.isEmpty) {
             return Center(
               child: Column(
@@ -2380,7 +2567,9 @@ class _BookContentPageState extends State<BookContentPage>
             );
           }
 
-          debugPrint('DEBUG: Videos Tab - rendering video list with ${videoContents.length} videos');
+          debugPrint(
+            'DEBUG: Videos Tab - rendering video list with ${videoContents.length} videos',
+          );
           return _buildVideoList(videoContents);
         } else if (state is BookContentError) {
           debugPrint('DEBUG: Videos Tab - error: ${state.message}');
@@ -2452,7 +2641,7 @@ class _BookContentPageState extends State<BookContentPage>
             borderRadius: BorderRadius.circular(12.r),
             boxShadow: [
               BoxShadow(
-  color: Colors.black.withValues(alpha: 0.1),
+                color: Colors.black.withValues(alpha: 0.1),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -2489,8 +2678,8 @@ class _BookContentPageState extends State<BookContentPage>
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-  Colors.black.withValues(alpha: 0.3),
-  Colors.black.withValues(alpha: 0.1),
+                          Colors.black.withValues(alpha: 0.3),
+                          Colors.black.withValues(alpha: 0.1),
                         ],
                       ),
                     ),
@@ -2499,11 +2688,11 @@ class _BookContentPageState extends State<BookContentPage>
                         width: 60.w,
                         height: 60.w,
                         decoration: BoxDecoration(
-  color: AppColors.primary.withValues(alpha: 0.9),
+                          color: AppColors.primary.withValues(alpha: 0.9),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-  color: Colors.black.withValues(alpha: 0.3),
+                              color: Colors.black.withValues(alpha: 0.3),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -2531,7 +2720,7 @@ class _BookContentPageState extends State<BookContentPage>
                         begin: Alignment.bottomCenter,
                         end: Alignment.topCenter,
                         colors: [
-  Colors.black.withValues(alpha: 0.8),
+                          Colors.black.withValues(alpha: 0.8),
                           Colors.transparent,
                         ],
                       ),
@@ -2640,7 +2829,10 @@ class _BookContentPageState extends State<BookContentPage>
                     SizedBox(height: 8.h),
                     Text(
                       "This book doesn't have any image content",
-                      style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[600],
+                      ),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -2744,7 +2936,9 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     return PageView.builder(
       controller: _pageController,
       itemCount: widget.imageContents.length,
-      physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       allowImplicitScrolling: true,
       onPageChanged: (index) {
         setState(() {
@@ -2782,7 +2976,12 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
           child: Transform.scale(
             scale: scale,
             child: Container(
-              margin: EdgeInsets.only(top: 40.h, bottom: 80.h, left: 24.w, right: 24.w),
+              margin: EdgeInsets.only(
+                top: 40.h,
+                bottom: 80.h,
+                left: 24.w,
+                right: 24.w,
+              ),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(40.r),
                 gradient: LinearGradient(
@@ -2792,7 +2991,7 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
                 ),
                 boxShadow: [
                   BoxShadow(
-  color: gradientColors[i - 1][0].withValues(alpha: 0.3),
+                    color: gradientColors[i - 1][0].withValues(alpha: 0.3),
                     blurRadius: 15,
                     offset: const Offset(0, 8),
                     spreadRadius: 0,
@@ -2813,7 +3012,9 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     final ctx = context;
     // Next image
     if (index + 1 < widget.imageContents.length) {
-      final nextUrl = _sanitizeUrlLocal(widget.imageContents[index + 1].fileUrl ?? '');
+      final nextUrl = _sanitizeUrlLocal(
+        widget.imageContents[index + 1].fileUrl ?? '',
+      );
       if (nextUrl.isNotEmpty) {
         final provider = CachedNetworkImageProvider(nextUrl);
         precacheImage(provider, ctx);
@@ -2821,7 +3022,9 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     }
     // Previous image
     if (index - 1 >= 0) {
-      final prevUrl = _sanitizeUrlLocal(widget.imageContents[index - 1].fileUrl ?? '');
+      final prevUrl = _sanitizeUrlLocal(
+        widget.imageContents[index - 1].fileUrl ?? '',
+      );
       if (prevUrl.isNotEmpty) {
         final provider = CachedNetworkImageProvider(prevUrl);
         precacheImage(provider, ctx);
@@ -2829,28 +3032,29 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
     }
   }
 
-  Widget _buildCard(
-    dynamic image, {
-    bool isBackground = false,
-  }) {
+  Widget _buildCard(dynamic image, {bool isBackground = false}) {
     return Container(
       margin: EdgeInsets.only(top: 40.h, bottom: 80.h, left: 24.w, right: 24.w),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(40.r),
-        color: isBackground ? Colors.white.withValues(alpha: 0.1) : Colors.white,
+        color:
+            isBackground ? Colors.white.withValues(alpha: 0.1) : Colors.white,
         border:
             isBackground
-                ? Border.all(color: Colors.white.withValues(alpha: 0.6), width: 2.0)
+                ? Border.all(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  width: 2.0,
+                )
                 : null,
         boxShadow: [
           BoxShadow(
-  color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
             offset: const Offset(0, 10),
             spreadRadius: 0,
           ),
           BoxShadow(
-  color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 6,
             offset: const Offset(0, 4),
           ),
@@ -2867,27 +3071,25 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
               height: double.infinity,
               fit: BoxFit.cover,
               fadeInDuration: const Duration(milliseconds: 200),
-              placeholder: (context, url) => Container(
-                color: Colors.grey[300],
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.grey[600],
+              placeholder:
+                  (context, url) => Container(
+                    color: Colors.grey[300],
+                    child: Center(
+                      child: CircularProgressIndicator(color: Colors.grey[600]),
+                    ),
                   ),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                color: Colors.grey[300],
-                child: const Center(
-                  child: Icon(
-                    Icons.image_not_supported,
-                    size: 100,
-                    color: Colors.grey,
+              errorWidget:
+                  (context, url, error) => Container(
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        size: 100,
+                        color: Colors.grey,
+                      ),
+                    ),
                   ),
-                ),
-              ),
             ),
-
-
 
             // Bottom overlay
             Positioned(
@@ -2905,9 +3107,9 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-  Colors.black.withValues(alpha: 0.9),
-  Colors.black.withValues(alpha: 0.6),
-                      Colors.transparent
+                      Colors.black.withValues(alpha: 0.9),
+                      Colors.black.withValues(alpha: 0.6),
+                      Colors.transparent,
                     ],
                     stops: [0.0, 0.5, 1.0],
                   ),
@@ -2929,10 +3131,11 @@ class _ImageCardStackWidgetState extends State<_ImageCardStackWidget>
                     ),
                     SizedBox(width: 16.w),
                     GestureDetector(
-                      onTap: () => _shareImage(
-                        image.fileUrl ?? '',
-                        image.title ?? '',
-                      ),
+                      onTap:
+                          () => _shareImage(
+                            image.fileUrl ?? '',
+                            image.title ?? '',
+                          ),
                       child: Container(
                         padding: EdgeInsets.all(8.w),
                         child: Icon(
@@ -3072,7 +3275,8 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
     }
     // Remove stray backticks and quotes
     u = u.replaceAll('`', '');
-    if ((u.startsWith('"') && u.endsWith('"')) || (u.startsWith("'") && u.endsWith("'"))) {
+    if ((u.startsWith('"') && u.endsWith('"')) ||
+        (u.startsWith("'") && u.endsWith("'"))) {
       u = u.substring(1, u.length - 1);
     }
     u = u.replaceAll('"', '').replaceAll("'", '');
@@ -3083,6 +3287,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+
       body: Stack(
         children: [
           // PDF Viewer
@@ -3093,7 +3298,10 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
             },
             onScaleUpdate: (details) {
               if (details.scale != 1.0) {
-                final newZoomLevel = (_currentZoomLevel * details.scale).clamp(0.5, 5.0);
+                final newZoomLevel = (_currentZoomLevel * details.scale).clamp(
+                  0.5,
+                  5.0,
+                );
                 if (newZoomLevel != _currentZoomLevel) {
                   setState(() {
                     _currentZoomLevel = newZoomLevel;
@@ -3102,81 +3310,90 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                 }
               }
             },
-            child: widget.isFromCache
-                ? SfPdfViewer.file(
-                    File(widget.pdfUrl),
-                    controller: _pdfController,
-                    canShowScrollHead: false,
-                    canShowScrollStatus: false,
-                    enableDoubleTapZooming: true,
-                    enableTextSelection: true,
-                    canShowPaginationDialog: false,
-                    onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                      setState(() {
-                        _isLoading = false;
-                        _totalPages = details.document.pages.count;
-                      });
-                    },
-                    onPageChanged: (PdfPageChangedDetails details) {
-                      setState(() {
-                        _currentPage = details.newPageNumber;
-                      });
-                    },
-                    onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-                      setState(() {
-                        _isLoading = false;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to load cached PDF: ${details.description}'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    },
-                  )
-                : SfPdfViewer.network(
-                    _sanitizeUrl(widget.pdfUrl),
-                    controller: _pdfController,
-                    canShowScrollHead: false,
-                    canShowScrollStatus: false,
-                    enableDoubleTapZooming: true,
-                    enableTextSelection: true,
-                    canShowPaginationDialog: false,
-                    onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                      setState(() {
-                        _isLoading = false;
-                        _totalPages = details.document.pages.count;
-                      });
-                    },
-                    onPageChanged: (PdfPageChangedDetails details) {
-                      setState(() {
-                        _currentPage = details.newPageNumber;
-                      });
-                    },
-                    onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-                      setState(() {
-                        _isLoading = false;
-                      });
-                      final openUrl = _sanitizeUrl(widget.pdfUrl);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Failed to load PDF: ${details.description}'),
-                          backgroundColor: Colors.red,
-                          action: SnackBarAction(
-                            label: 'Open in Tab',
-                            textColor: Colors.white,
-                            onPressed: () {
-                              // Use browser navigation for web
-                              // ignore: unsafe_html
-                              // For Flutter web, prefer launching a new tab via html.window
-                              // to avoid plugin overhead.
-                              _openInNewTab(openUrl);
-                            },
+            child:
+                widget.isFromCache
+                    ? SfPdfViewer.file(
+                      File(widget.pdfUrl),
+                      controller: _pdfController,
+                      canShowScrollHead: false,
+                      canShowScrollStatus: false,
+                      enableDoubleTapZooming: true,
+                      enableTextSelection: true,
+                      canShowPaginationDialog: false,
+                      onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                        setState(() {
+                          _isLoading = false;
+                          _totalPages = details.document.pages.count;
+                        });
+                      },
+                      onPageChanged: (PdfPageChangedDetails details) {
+                        setState(() {
+                          _currentPage = details.newPageNumber;
+                        });
+                      },
+                      onDocumentLoadFailed: (
+                        PdfDocumentLoadFailedDetails details,
+                      ) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Failed to load cached PDF: ${details.description}',
+                            ),
+                            backgroundColor: Colors.red,
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    )
+                    : SfPdfViewer.network(
+                      _sanitizeUrl(widget.pdfUrl),
+                      controller: _pdfController,
+                      canShowScrollHead: false,
+                      canShowScrollStatus: false,
+                      enableDoubleTapZooming: true,
+                      enableTextSelection: true,
+                      canShowPaginationDialog: false,
+                      onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                        setState(() {
+                          _isLoading = false;
+                          _totalPages = details.document.pages.count;
+                        });
+                      },
+                      onPageChanged: (PdfPageChangedDetails details) {
+                        setState(() {
+                          _currentPage = details.newPageNumber;
+                        });
+                      },
+                      onDocumentLoadFailed: (
+                        PdfDocumentLoadFailedDetails details,
+                      ) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                        final openUrl = _sanitizeUrl(widget.pdfUrl);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Failed to load PDF: ${details.description}',
+                            ),
+                            backgroundColor: Colors.red,
+                            action: SnackBarAction(
+                              label: 'Open in Tab',
+                              textColor: Colors.white,
+                              onPressed: () {
+                                // Use browser navigation for web
+                                // ignore: unsafe_html
+                                // For Flutter web, prefer launching a new tab via html.window
+                                // to avoid plugin overhead.
+                                _openInNewTab(openUrl);
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    ),
           ),
 
           // Loading indicator
@@ -3188,15 +3405,14 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
                     ),
                     SizedBox(height: 16),
                     Text(
                       'Loading PDF...',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16.sp,
-                      ),
+                      style: TextStyle(color: Colors.white, fontSize: 16.sp),
                     ),
                   ],
                 ),
@@ -3221,7 +3437,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-  Colors.black.withValues(alpha: 0.8),
+                      Colors.black.withValues(alpha: 0.8),
                       Colors.transparent,
                     ],
                   ),
@@ -3268,7 +3484,7 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                     colors: [
-  Colors.black.withValues(alpha: 0.8),
+                      Colors.black.withValues(alpha: 0.8),
                       Colors.transparent,
                     ],
                   ),
@@ -3277,9 +3493,12 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                   children: [
                     // Page info
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-  color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
@@ -3292,19 +3511,19 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                       ),
                     ),
                     SizedBox(width: 16),
-                    
+
                     // Go to page button
                     IconButton(
                       icon: Icon(Icons.bookmark, color: Colors.white),
                       onPressed: _goToPage,
                     ),
-                    
+
                     Spacer(),
-                    
+
                     // Zoom controls
                     Container(
                       decoration: BoxDecoration(
-  color: Colors.white.withValues(alpha: 0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
@@ -3312,7 +3531,8 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                         children: [
                           IconButton(
                             icon: Icon(Icons.remove, color: Colors.white),
-                            onPressed: _currentZoomLevel > 0.5 ? _zoomOut : null,
+                            onPressed:
+                                _currentZoomLevel > 0.5 ? _zoomOut : null,
                           ),
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 8),
@@ -3327,7 +3547,8 @@ class _FullscreenPdfViewerState extends State<_FullscreenPdfViewer> {
                           ),
                           IconButton(
                             icon: Icon(Icons.refresh, color: Colors.white),
-                            onPressed: _currentZoomLevel != 1.0 ? _resetZoom : null,
+                            onPressed:
+                                _currentZoomLevel != 1.0 ? _resetZoom : null,
                           ),
                           IconButton(
                             icon: Icon(Icons.add, color: Colors.white),
