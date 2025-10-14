@@ -2058,13 +2058,13 @@ class _BookContentPageState extends State<BookContentPage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: () {
-                  context.read<QuizCubit>().resetBookAnswers(bookId);
-                },
-                child: Icon(Icons.reset_tv),
-              ),
-              // Score and Progress Card
+              // GestureDetector(
+              //   onTap: () {
+              //     context.read<QuizCubit>().resetBookAnswers(bookId);
+              //   },
+              //   child: Icon(Icons.reset_tv),
+              // ),
+              // // Score and Progress Card
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(30.w),
