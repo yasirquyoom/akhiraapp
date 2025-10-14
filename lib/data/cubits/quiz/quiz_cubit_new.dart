@@ -768,6 +768,11 @@ class QuizCubit extends Cubit<QuizState> {
         final originalQuizzes =
             response.data!.quizzes; // Store original quiz data
 
+        print('Quiz API returned ${originalQuizzes.length} questions');
+        for (final quiz in originalQuizzes) {
+          print('Quiz ${quiz.quizId}: is_attempted=${quiz.isAttempted}');
+        }
+
         // Load ALL questions (both attempted and unattempted)
         for (final quiz in originalQuizzes) {
           final question = QuizQuestion(
@@ -782,31 +787,63 @@ class QuizCubit extends Cubit<QuizState> {
 
         if (questions.isNotEmpty) {
           // Calculate completion based on quiz API data (is_attempted field)
-          final attemptedCount =
+          final attemptedCountFromQuiz =
               originalQuizzes.where((quiz) => quiz.isAttempted).length;
-          final remainingCount =
+          final remainingCountFromQuiz =
               originalQuizzes.where((quiz) => !quiz.isAttempted).length;
 
           print(
-            'Quiz API data - attemptedCount: $attemptedCount, remainingCount: $remainingCount',
+            'Quiz API data - attemptedCount: $attemptedCountFromQuiz, remainingCount: $remainingCountFromQuiz',
           );
 
           // Get fresh score data for marks and percentage
           try {
             final scoreResp = await _repository.getScore(bookId: bookId);
             final data = scoreResp.data['data'];
+            final attemptedCountFromScore = data['questions_attempted'] ?? 0;
+            final remainingCountFromScore =
+                data['remaining_questions'] ?? questions.length;
+
+            print(
+              'Score API data - attemptedCount: $attemptedCountFromScore, remainingCount: $remainingCountFromScore',
+            );
+
+            // Use local tracking if APIs return stale data
+            final localAttemptedCount = _answeredQuestionIds.length;
+            final localRemainingCount = questions.length - localAttemptedCount;
+
+            print(
+              'Local tracking - attemptedCount: $localAttemptedCount, remainingCount: $localRemainingCount',
+            );
+
+            // Use the most reliable data source
+            final finalAttemptedCount =
+                localAttemptedCount > 0
+                    ? localAttemptedCount
+                    : (remainingCountFromScore == 0
+                        ? attemptedCountFromScore
+                        : attemptedCountFromQuiz);
+            final finalRemainingCount =
+                localAttemptedCount > 0
+                    ? localRemainingCount
+                    : (remainingCountFromScore == 0
+                        ? remainingCountFromScore
+                        : remainingCountFromQuiz);
+
+            print(
+              'Final values - attemptedCount: $finalAttemptedCount, remainingCount: $finalRemainingCount',
+            );
+
             emit(
               QuizLoaded(
                 questions: questions,
                 originalQuizzes: originalQuizzes,
-                totalAttempted:
-                    attemptedCount, // Use calculated value from quiz API
+                totalAttempted: finalAttemptedCount,
                 totalPossibleMarks:
                     data['total_possible_marks'] ?? questions.length,
                 marksEarned: data['marks_earned'] ?? 0,
                 percentage: (data['percentage'] ?? 0).toDouble(),
-                remainingQuestions:
-                    remainingCount, // Use calculated value from quiz API
+                remainingQuestions: finalRemainingCount,
                 totalQuestionsFromApi: questions.length,
               ),
             );
@@ -816,11 +853,11 @@ class QuizCubit extends Cubit<QuizState> {
               QuizLoaded(
                 questions: questions,
                 originalQuizzes: originalQuizzes,
-                totalAttempted: attemptedCount,
+                totalAttempted: attemptedCountFromQuiz,
                 totalPossibleMarks: questions.length,
                 marksEarned: 0,
                 percentage: 0.0,
-                remainingQuestions: remainingCount,
+                remainingQuestions: remainingCountFromQuiz,
                 totalQuestionsFromApi: questions.length,
               ),
             );
@@ -901,54 +938,31 @@ class QuizCubit extends Cubit<QuizState> {
         }
 
         if (questions.isNotEmpty) {
-          // Calculate completion based on quiz API data (is_attempted field)
+          // After reset, all questions should be unattempted, so use quiz API data directly
           final attemptedCount =
               originalQuizzes.where((quiz) => quiz.isAttempted).length;
           final remainingCount =
               originalQuizzes.where((quiz) => !quiz.isAttempted).length;
 
-          // Get fresh score data for marks and percentage
-          try {
-            final scoreResp = await _repository.getScore(bookId: bookId);
-            final data = scoreResp.data['data'];
-            print('Score API Response After Reset: $data');
-            print(
-              'Cubit State After Reset: remainingQuestions=$remainingCount, totalQuestionsFromApi=${questions.length}, totalAttempted=$attemptedCount, questions.length=${questions.length}',
-            );
+          print(
+            'Cubit State After Reset: remainingQuestions=$remainingCount, totalQuestionsFromApi=${questions.length}, totalAttempted=$attemptedCount, questions.length=${questions.length}',
+          );
 
-            emit(
-              QuizLoaded(
-                questions: questions,
-                originalQuizzes: originalQuizzes,
-                totalAttempted:
-                    attemptedCount, // Use calculated value from quiz API
-                totalPossibleMarks:
-                    data['total_possible_marks'] ?? questions.length,
-                marksEarned: data['marks_earned'] ?? 0,
-                percentage: (data['percentage'] ?? 0).toDouble(),
-                remainingQuestions:
-                    remainingCount, // Use calculated value from quiz API
-                totalQuestionsFromApi: questions.length,
-              ),
-            );
-          } catch (_) {
-            // If score API fails, use calculated values
-            print(
-              'Cubit State After Reset (Fallback): remainingQuestions=$remainingCount, totalQuestionsFromApi=${questions.length}, totalAttempted=$attemptedCount, questions.length=${questions.length}',
-            );
-            emit(
-              QuizLoaded(
-                questions: questions,
-                originalQuizzes: originalQuizzes,
-                totalAttempted: attemptedCount,
-                totalPossibleMarks: questions.length,
-                marksEarned: 0,
-                percentage: 0.0,
-                remainingQuestions: remainingCount,
-                totalQuestionsFromApi: questions.length,
-              ),
-            );
-          }
+          // After reset, use quiz API data directly (don't rely on score API which might be stale)
+          emit(
+            QuizLoaded(
+              questions: questions,
+              originalQuizzes: originalQuizzes,
+              totalAttempted:
+                  attemptedCount, // Use calculated value from quiz API
+              totalPossibleMarks: questions.length,
+              marksEarned: 0, // Reset to 0 after reset
+              percentage: 0.0, // Reset to 0 after reset
+              remainingQuestions:
+                  remainingCount, // Use calculated value from quiz API
+              totalQuestionsFromApi: questions.length,
+            ),
+          );
         } else {
           emit(QuizInitial());
         }
