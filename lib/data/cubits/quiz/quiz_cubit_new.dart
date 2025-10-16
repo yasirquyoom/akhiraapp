@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import '../../repositories/quiz_repository.dart';
 import '../../models/quiz_response.dart';
 
@@ -193,9 +194,7 @@ class QuizError extends QuizState {
 // Cubit
 class QuizCubit extends Cubit<QuizState> {
   final QuizRepository _repository;
-  String? _currentBookId; // track current book for score refreshes
-  final Set<String> _answeredQuestionIds =
-      {}; // track locally answered questions
+  String? _currentBookId;
 
   QuizCubit(this._repository) : super(QuizInitial());
 
@@ -243,115 +242,110 @@ class QuizCubit extends Cubit<QuizState> {
   }
 
   Future<void> loadQuizzesFromApi({required String bookId}) async {
-    // Remember current book id to enable score refreshes after submit
     _currentBookId = bookId;
-
-    // Check if quiz is already completed to avoid unnecessary loading
-    if (state is QuizLoaded) {
-      final currentState = state as QuizLoaded;
-      final isCompleted =
-          currentState.remainingQuestions == 0 &&
-          (currentState.totalQuestionsFromApi > 0 ||
-              currentState.totalAttempted > 0);
-      if (isCompleted) {
-        return;
-      }
-    }
-
-    // Also check completion by making a quick score API call first
-    try {
-      final scoreResp = await _repository.getScore(bookId: bookId);
-      final data = scoreResp.data['data'];
-      final remainingQuestions = data['remaining_questions'] ?? 0;
-      final totalQuestions = data['total_questions'] ?? 0;
-      final questionsAttempted = data['questions_attempted'] ?? 0;
-
-      // If quiz is completed, just emit the completed state and return
-      if (remainingQuestions == 0 &&
-          totalQuestions > 0 &&
-          questionsAttempted > 0) {
-        emit(
-          QuizLoaded(
-            questions: const [],
-            originalQuizzes: const [],
-            score: data['correct_answers'] ?? 0,
-            totalAttempted: questionsAttempted,
-            totalPossibleMarks: data['total_possible_marks'] ?? 0,
-            marksEarned: data['marks_earned'] ?? 0,
-            percentage: (data['percentage'] ?? 0).toDouble(),
-            remainingQuestions: remainingQuestions,
-            totalQuestionsFromApi: totalQuestions,
-          ),
-        );
-        return;
-      }
-    } catch (_) {
-      // If score API fails, continue with normal loading
-    }
+    debugPrint('📚 [QUIZ CUBIT] Loading quizzes for bookId: $bookId');
 
     emit(QuizLoading());
 
     try {
+      // Always fetch fresh quiz data - no caching
       final response = await _repository.getBookQuizzes(bookId: bookId);
+      debugPrint(
+        '📚 [QUIZ CUBIT] Quiz API Response Status: ${response.status}',
+      );
 
       if (response.status == 200 && response.data != null) {
-        final questions = <QuizQuestion>[];
-        final originalQuizzes =
-            response.data!.quizzes; // Store original quiz data
+        final originalQuizzes = response.data!.quizzes;
+        debugPrint(
+          '📚 [QUIZ CUBIT] Total quizzes from API: ${originalQuizzes.length}',
+        );
 
-        // Load ALL questions (both attempted and unattempted)
+        // Parse ONLY unattempted questions
+        final questions = <QuizQuestion>[];
         for (final quiz in originalQuizzes) {
-          final question = QuizQuestion(
-            id: quiz.quizId,
-            question: quiz.question,
-            options: _parseQuizOptions(quiz),
-            // Normalize to 'option#' style to match our selectedOption ids
-            correctAnswerId: _normalizeToOptionKey(quiz.correctOption),
+          debugPrint(
+            '   - Quiz ${quiz.quizId}: is_attempted=${quiz.isAttempted}',
           );
-          questions.add(question);
+
+          // Only add unattempted questions to the list
+          if (!quiz.isAttempted) {
+            final question = QuizQuestion(
+              id: quiz.quizId,
+              question: quiz.question,
+              options: _parseQuizOptions(quiz),
+              correctAnswerId: _normalizeToOptionKey(quiz.correctOption),
+            );
+            questions.add(question);
+          }
         }
 
-        if (questions.isNotEmpty) {
-          // Get fresh score data to ensure correct remainingQuestions
-          try {
-            final scoreResp = await _repository.getScore(bookId: bookId);
-            final data = scoreResp.data['data'];
-            emit(
-              QuizLoaded(
-                questions: questions,
-                originalQuizzes: originalQuizzes,
-                totalAttempted: data['questions_attempted'] ?? 0,
-                totalPossibleMarks: data['total_possible_marks'] ?? 0,
-                marksEarned: data['marks_earned'] ?? 0,
-                percentage: (data['percentage'] ?? 0).toDouble(),
-                remainingQuestions:
-                    data['remaining_questions'] ?? questions.length,
-                totalQuestionsFromApi:
-                    data['total_questions'] ?? questions.length,
-              ),
-            );
-          } catch (_) {
-            // If score API fails, use fallback values
-            emit(
-              QuizLoaded(
-                questions: questions,
-                originalQuizzes: originalQuizzes,
-                totalAttempted: 0,
-                totalPossibleMarks: questions.length,
-                marksEarned: 0,
-                percentage: 0.0,
-                remainingQuestions: questions.length,
-                totalQuestionsFromApi: questions.length,
-              ),
-            );
+        debugPrint(
+          '📚 [QUIZ CUBIT] Unattempted questions: ${questions.length}',
+        );
+
+        // Always fetch fresh score data - no caching
+        try {
+          final scoreResp = await _repository.getScore(bookId: bookId);
+          final data = scoreResp.data['data'];
+
+          debugPrint('📊 [QUIZ CUBIT] Score API Response:');
+          debugPrint('   - total_questions: ${data['total_questions']}');
+          debugPrint(
+            '   - questions_attempted: ${data['questions_attempted']}',
+          );
+          debugPrint('   - correct_answers: ${data['correct_answers']}');
+          debugPrint('   - marks_earned: ${data['marks_earned']}');
+          debugPrint(
+            '   - total_possible_marks: ${data['total_possible_marks']}',
+          );
+          debugPrint('   - percentage: ${data['percentage']}');
+          debugPrint(
+            '   - remaining_questions: ${data['remaining_questions']}',
+          );
+
+          if (questions.isEmpty) {
+            debugPrint('📚 [QUIZ CUBIT] Quiz completed! Showing score card.');
           }
-        } else {
-          emit(QuizInitial());
+
+          emit(
+            QuizLoaded(
+              questions: questions,
+              originalQuizzes: originalQuizzes,
+              score: data['correct_answers'] ?? 0,
+              totalAttempted: data['questions_attempted'] ?? 0,
+              totalPossibleMarks: data['total_possible_marks'] ?? 0,
+              marksEarned: data['marks_earned'] ?? 0,
+              percentage: (data['percentage'] ?? 0).toDouble(),
+              remainingQuestions: data['remaining_questions'] ?? 0,
+              totalQuestionsFromApi:
+                  data['total_questions'] ?? originalQuizzes.length,
+            ),
+          );
+        } catch (e) {
+          debugPrint('❌ [QUIZ CUBIT] Score API Error: $e');
+          // If score API fails, check if quiz is completed
+          if (questions.isEmpty) {
+            debugPrint('📚 [QUIZ CUBIT] Quiz completed but score API failed');
+          }
+          emit(
+            QuizLoaded(
+              questions: questions,
+              originalQuizzes: originalQuizzes,
+              totalAttempted: 0,
+              totalPossibleMarks: originalQuizzes.length,
+              marksEarned: 0,
+              percentage: 0.0,
+              remainingQuestions: questions.length,
+              totalQuestionsFromApi: originalQuizzes.length,
+            ),
+          );
         }
       } else {
+        debugPrint('❌ [QUIZ CUBIT] Quiz API Error: ${response.message}');
         emit(QuizError(message: response.message));
       }
     } catch (e) {
+      debugPrint('❌ [QUIZ CUBIT] Exception: $e');
       emit(QuizError(message: e.toString()));
     }
   }
@@ -401,484 +395,122 @@ class QuizCubit extends Cubit<QuizState> {
     final selected = currentState.selectedOptionId;
     if (selected == null) return;
 
+    debugPrint(
+      '✅ [QUIZ CUBIT] Submitting answer for question: ${currentState.currentQuestion.id}',
+    );
+    debugPrint('   - Selected option: $selected');
+
     // Show submitting loader
     emit(currentState.copyWith(isSubmitting: true));
 
-    // Optimistic update for instant UX
-    final isCorrect = selected == currentState.currentQuestion.correctAnswerId;
-    final optimisticAnswer = QuizAnswer(
-      questionId: currentState.currentQuestion.id,
-      selectedOptionId: selected,
-      isCorrect: isCorrect,
-      answeredAt: DateTime.now(),
-    );
-    final optimisticAnswers = [...currentState.answers, optimisticAnswer];
-    emit(
-      currentState.copyWith(
-        answers: optimisticAnswers,
-        selectedOptionId: null,
-        score: optimisticAnswers.where((a) => a.isCorrect).length,
-        // Optimistically update marks and attempts for immediate UI feedback
-        marksEarned: currentState.marksEarned + (isCorrect ? 1 : 0),
-        // Keep percentage/remainingQuestions driven by server to avoid mismatch
-        isSubmitting: true,
-      ),
-    );
-
-    // Send to API, then refresh score and quiz data
+    // Send to API and refresh data
     _repository
         .submitAnswer(
           quizId: currentState.currentQuestion.id,
-          // Send option1, option2, etc. as requested by the API
           userAnswer: _mapOptionKeyToApiAnswer(selected),
         )
         .then((response) async {
-          // Check if submission was successful by looking at response body status
           final responseData = response.data;
           final status = responseData?['status'];
 
-          if (status == 201 || status == 200) {
-            // Track this question as answered locally to prevent duplicate submissions
-            _answeredQuestionIds.add(currentState.currentQuestion.id);
+          debugPrint('✅ [QUIZ CUBIT] Submit Answer Response Status: $status');
+          debugPrint('   - Response: $responseData');
 
-            // Refresh score first
-            await _refreshScore();
-            // Then refresh quiz data to get updated questions (this will filter out attempted questions)
+          if (status == 201 || status == 200) {
+            // Submission successful - fetch fresh data
             if (_currentBookId != null) {
               await loadQuizzesFromApi(bookId: _currentBookId!);
             }
 
-            // After refreshing, the quiz list will only contain unattempted questions
-            // The current question will be automatically filtered out, so we start from index 0
+            // Move to first question (which will be the next unattempted one)
             final s = state;
             if (s is QuizLoaded) {
-              if (s.questions.isNotEmpty) {
-                // Move to the first unattempted question (index 0 after filtering)
-                final firstQuestion = s.questions[0];
-                final existingAnswer =
-                    s.answers
-                        .where((a) => a.questionId == firstQuestion.id)
-                        .firstOrNull;
-                emit(
-                  s.copyWith(
-                    currentQuestionIndex: 0,
-                    selectedOptionId: existingAnswer?.selectedOptionId,
-                    isSubmitting: false,
-                  ),
-                );
-              } else {
-                // No more unattempted questions: quiz is completed, just stop submitting
-                // The UI will show the score card based on the completion logic
-                emit(s.copyWith(isSubmitting: false));
-              }
+              emit(
+                s.copyWith(
+                  currentQuestionIndex: 0,
+                  selectedOptionId: null,
+                  isSubmitting: false,
+                ),
+              );
             }
           } else {
-            // Submission failed, revert optimistic update
-            print('Quiz submission failed: ${responseData?['message']}');
-            print(
-              'Reverting optimistic update - keeping question at index: ${currentState.currentQuestionIndex}',
+            // Submission failed
+            debugPrint(
+              '❌ [QUIZ CUBIT] Submit failed: ${responseData?['message']}',
             );
-            emit(
-              currentState.copyWith(
-                answers: currentState.answers,
-                selectedOptionId: selected,
-                score: currentState.score,
-                marksEarned: currentState.marksEarned,
-                isSubmitting: false,
-              ),
-            );
-          }
-        })
-        .whenComplete(() {
-          // Hide submitting loader
-          final s = state;
-          if (s is QuizLoaded) {
-            emit(s.copyWith(isSubmitting: false));
+            emit(currentState.copyWith(isSubmitting: false));
           }
         })
         .catchError((error) {
-          // Revert optimistic update on error
-          emit(
-            currentState.copyWith(
-              answers: currentState.answers,
-              selectedOptionId: selected,
-              score: currentState.score,
-              marksEarned: currentState.marksEarned,
-              isSubmitting: false,
-            ),
-          );
+          debugPrint('❌ [QUIZ CUBIT] Submit error: $error');
+          emit(currentState.copyWith(isSubmitting: false));
         });
   }
 
-  // Atomic: submit and advance to next question in one action
+  // Submit and advance to next question in one action
   void submitAndAdvance({required String bookId}) {
     if (state is! QuizLoaded) return;
     final currentState = state as QuizLoaded;
     final selected = currentState.selectedOptionId;
     if (selected == null) return;
 
-    // Show submitting loader
+    debugPrint(
+      '✅ [QUIZ CUBIT] Submit and advance for question: ${currentState.currentQuestion.id}',
+    );
+
     emit(currentState.copyWith(isSubmitting: true));
 
-    // Optimistic update
-    final isCorrect = selected == currentState.currentQuestion.correctAnswerId;
-    final optimisticAnswer = QuizAnswer(
-      questionId: currentState.currentQuestion.id,
-      selectedOptionId: selected,
-      isCorrect: isCorrect,
-      answeredAt: DateTime.now(),
-    );
-    final optimisticAnswers = [...currentState.answers, optimisticAnswer];
-    emit(
-      currentState.copyWith(
-        answers: optimisticAnswers,
-        selectedOptionId: null,
-        score: optimisticAnswers.where((a) => a.isCorrect).length,
-        // Optimistically update marks and attempts for immediate UI feedback
-        marksEarned: currentState.marksEarned + (isCorrect ? 1 : 0),
-        // Keep percentage/remainingQuestions driven by server to avoid mismatch
-        isSubmitting: true,
-      ),
-    );
-
-    // Fire API and score refresh, then advance
     _repository
         .submitAnswer(
           quizId: currentState.currentQuestion.id,
-          // Send option1, option2, etc. as requested by the API
           userAnswer: _mapOptionKeyToApiAnswer(selected),
         )
         .then((response) async {
-          // Check if submission was successful by looking at response body status
           final responseData = response.data;
           final status = responseData?['status'];
 
-          if (status == 201 || status == 200) {
-            // Track this question as answered locally to prevent duplicate submissions
-            _answeredQuestionIds.add(currentState.currentQuestion.id);
+          debugPrint(
+            '✅ [QUIZ CUBIT] Submit & Advance Response Status: $status',
+          );
 
-            // Refresh score first (force refresh after submission)
-            await _forceRefreshScore(bookId);
-            // Then refresh quiz data to get updated questions (this will filter out attempted questions)
+          if (status == 201 || status == 200) {
+            // Fetch fresh data
             if (_currentBookId != null) {
-              print('Calling _forceLoadQuizzesFromApi after submission');
-              await _forceLoadQuizzesFromApi(bookId: _currentBookId!);
+              await loadQuizzesFromApi(bookId: _currentBookId!);
             }
 
-            // After refreshing, find the next unattempted question
+            // Move to first question
             final s = state;
             if (s is QuizLoaded) {
-              if (s.questions.isNotEmpty) {
-                // Find the next unattempted question
-                int nextUnattemptedIndex = -1;
-                for (int i = 0; i < s.questions.length; i++) {
-                  final question = s.questions[i];
-                  final isAttempted =
-                      question.id == currentState.currentQuestion.id ||
-                      _answeredQuestionIds.contains(question.id);
-                  if (!isAttempted) {
-                    nextUnattemptedIndex = i;
-                    break;
-                  }
-                }
-
-                if (nextUnattemptedIndex != -1) {
-                  // Move to the next unattempted question
-                  final nextQuestion = s.questions[nextUnattemptedIndex];
-                  final existingAnswer =
-                      s.answers
-                          .where((a) => a.questionId == nextQuestion.id)
-                          .firstOrNull;
-                  emit(
-                    s.copyWith(
-                      currentQuestionIndex: nextUnattemptedIndex,
-                      selectedOptionId: existingAnswer?.selectedOptionId,
-                      isSubmitting: false,
-                    ),
-                  );
-                } else {
-                  // No more unattempted questions: quiz is completed
-                  emit(s.copyWith(isSubmitting: false));
-                }
-              } else {
-                // No questions available
-                emit(s.copyWith(isSubmitting: false));
-              }
+              emit(
+                s.copyWith(
+                  currentQuestionIndex: 0,
+                  selectedOptionId: null,
+                  isSubmitting: false,
+                ),
+              );
             }
           } else {
-            // Submission failed, revert optimistic update
-            print('Quiz submission failed: ${responseData?['message']}');
-            print(
-              'Reverting optimistic update - keeping question at index: ${currentState.currentQuestionIndex}',
-            );
-            emit(
-              currentState.copyWith(
-                answers: currentState.answers,
-                selectedOptionId: selected,
-                score: currentState.score,
-                marksEarned: currentState.marksEarned,
-                isSubmitting: false,
-              ),
-            );
-          }
-        })
-        .whenComplete(() {
-          // Ensure submitting loader is hidden
-          final s = state;
-          if (s is QuizLoaded && s.isSubmitting) {
-            emit(s.copyWith(isSubmitting: false));
+            debugPrint('❌ [QUIZ CUBIT] Submit & Advance failed');
+            emit(currentState.copyWith(isSubmitting: false));
           }
         })
         .catchError((error) {
-          // Revert optimistic update on error
-          emit(
-            currentState.copyWith(
-              answers: currentState.answers,
-              selectedOptionId: selected,
-              score: currentState.score,
-              marksEarned: currentState.marksEarned,
-              isSubmitting: false,
-            ),
-          );
+          debugPrint('❌ [QUIZ CUBIT] Submit & Advance error: $error');
+          emit(currentState.copyWith(isSubmitting: false));
         });
   }
 
-  Future<void> _refreshScore() async {
-    if (state is! QuizLoaded) return;
-    final currentState = state as QuizLoaded;
-
-    // Check if quiz is already completed to avoid unnecessary refreshes
-    final isCompleted =
-        currentState.remainingQuestions == 0 &&
-        (currentState.totalQuestionsFromApi > 0 ||
-            currentState.totalAttempted > 0);
-    if (isCompleted) {
-      return;
-    }
-
-    final bookId = _currentBookId;
-    if (bookId == null || bookId.isEmpty) return;
-    try {
-      final resp = await _repository.getScore(bookId: bookId);
-      final data = resp.data['data'];
-      emit(
-        currentState.copyWith(
-          score: data['correct_answers'] ?? currentState.score,
-          totalAttempted:
-              data['questions_attempted'] ?? currentState.totalAttempted,
-          totalPossibleMarks:
-              data['total_possible_marks'] ?? currentState.totalPossibleMarks,
-          marksEarned: data['marks_earned'] ?? currentState.marksEarned,
-          percentage:
-              (data['percentage'] ?? currentState.percentage).toDouble(),
-          remainingQuestions:
-              data['remaining_questions'] ?? currentState.remainingQuestions,
-          totalQuestionsFromApi:
-              data['total_questions'] ?? currentState.totalQuestionsFromApi,
-        ),
-      );
-    } catch (_) {
-      // ignore
-    }
-  }
-
   Future<void> refreshBookScore(String bookId) async {
-    if (state is! QuizLoaded) return;
-    final currentState = state as QuizLoaded;
-
-    // Check if quiz is already completed to avoid unnecessary refreshes
-    final isCompleted =
-        currentState.remainingQuestions == 0 &&
-        (currentState.totalQuestionsFromApi > 0 ||
-            currentState.totalAttempted > 0);
-    if (isCompleted) {
-      return;
-    }
-
-    try {
-      final resp = await _repository.getScore(bookId: bookId);
-      final data = resp.data['data'];
-      emit(
-        currentState.copyWith(
-          score: data['correct_answers'] ?? currentState.score,
-          totalAttempted:
-              data['questions_attempted'] ?? currentState.totalAttempted,
-          totalPossibleMarks:
-              data['total_possible_marks'] ?? currentState.totalPossibleMarks,
-          marksEarned: data['marks_earned'] ?? currentState.marksEarned,
-          percentage:
-              (data['percentage'] ?? currentState.percentage).toDouble(),
-          remainingQuestions:
-              data['remaining_questions'] ?? currentState.remainingQuestions,
-          totalQuestionsFromApi:
-              data['total_questions'] ?? currentState.totalQuestionsFromApi,
-        ),
-      );
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  // Force refresh score without completion checks (used after submission)
-  Future<void> _forceRefreshScore(String bookId) async {
-    if (state is! QuizLoaded) return;
-    final currentState = state as QuizLoaded;
-
-    try {
-      final resp = await _repository.getScore(bookId: bookId);
-      final data = resp.data['data'];
-      print(
-        'Force Refresh Score: API data - remainingQuestions=${data['remaining_questions']}, totalAttempted=${data['questions_attempted']}',
-      );
-      emit(
-        currentState.copyWith(
-          score: data['correct_answers'] ?? currentState.score,
-          totalAttempted:
-              data['questions_attempted'] ?? currentState.totalAttempted,
-          totalPossibleMarks:
-              data['total_possible_marks'] ?? currentState.totalPossibleMarks,
-          marksEarned: data['marks_earned'] ?? currentState.marksEarned,
-          percentage:
-              (data['percentage'] ?? currentState.percentage).toDouble(),
-          remainingQuestions:
-              data['remaining_questions'] ?? currentState.remainingQuestions,
-          totalQuestionsFromApi:
-              data['total_questions'] ?? currentState.totalQuestionsFromApi,
-        ),
-      );
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  // Force load quizzes without completion checks (used after submission)
-  Future<void> _forceLoadQuizzesFromApi({required String bookId}) async {
-    print('_forceLoadQuizzesFromApi called for bookId: $bookId');
-    _currentBookId = bookId;
-
-    emit(QuizLoading());
-
-    try {
-      print('Making quiz API call for bookId: $bookId');
-      final response = await _repository.getBookQuizzes(bookId: bookId);
-      print('Quiz API response status: ${response.status}');
-
-      if (response.status == 200 && response.data != null) {
-        final questions = <QuizQuestion>[];
-        final originalQuizzes =
-            response.data!.quizzes; // Store original quiz data
-
-        print('Quiz API returned ${originalQuizzes.length} questions');
-        for (final quiz in originalQuizzes) {
-          print('Quiz ${quiz.quizId}: is_attempted=${quiz.isAttempted}');
-        }
-
-        // Load ALL questions (both attempted and unattempted)
-        for (final quiz in originalQuizzes) {
-          final question = QuizQuestion(
-            id: quiz.quizId,
-            question: quiz.question,
-            options: _parseQuizOptions(quiz),
-            // Normalize to 'option#' style to match our selectedOption ids
-            correctAnswerId: _normalizeToOptionKey(quiz.correctOption),
-          );
-          questions.add(question);
-        }
-
-        if (questions.isNotEmpty) {
-          // Calculate completion based on quiz API data (is_attempted field)
-          final attemptedCountFromQuiz =
-              originalQuizzes.where((quiz) => quiz.isAttempted).length;
-          final remainingCountFromQuiz =
-              originalQuizzes.where((quiz) => !quiz.isAttempted).length;
-
-          print(
-            'Quiz API data - attemptedCount: $attemptedCountFromQuiz, remainingCount: $remainingCountFromQuiz',
-          );
-
-          // Get fresh score data for marks and percentage
-          try {
-            final scoreResp = await _repository.getScore(bookId: bookId);
-            final data = scoreResp.data['data'];
-            final attemptedCountFromScore = data['questions_attempted'] ?? 0;
-            final remainingCountFromScore =
-                data['remaining_questions'] ?? questions.length;
-
-            print(
-              'Score API data - attemptedCount: $attemptedCountFromScore, remainingCount: $remainingCountFromScore',
-            );
-
-            // Use local tracking if APIs return stale data
-            final localAttemptedCount = _answeredQuestionIds.length;
-            final localRemainingCount = questions.length - localAttemptedCount;
-
-            print(
-              'Local tracking - attemptedCount: $localAttemptedCount, remainingCount: $localRemainingCount',
-            );
-
-            // Use the most reliable data source
-            final finalAttemptedCount =
-                localAttemptedCount > 0
-                    ? localAttemptedCount
-                    : (remainingCountFromScore == 0
-                        ? attemptedCountFromScore
-                        : attemptedCountFromQuiz);
-            final finalRemainingCount =
-                localAttemptedCount > 0
-                    ? localRemainingCount
-                    : (remainingCountFromScore == 0
-                        ? remainingCountFromScore
-                        : remainingCountFromQuiz);
-
-            print(
-              'Final values - attemptedCount: $finalAttemptedCount, remainingCount: $finalRemainingCount',
-            );
-
-            emit(
-              QuizLoaded(
-                questions: questions,
-                originalQuizzes: originalQuizzes,
-                totalAttempted: finalAttemptedCount,
-                totalPossibleMarks:
-                    data['total_possible_marks'] ?? questions.length,
-                marksEarned: data['marks_earned'] ?? 0,
-                percentage: (data['percentage'] ?? 0).toDouble(),
-                remainingQuestions: finalRemainingCount,
-                totalQuestionsFromApi: questions.length,
-              ),
-            );
-          } catch (_) {
-            // If score API fails, use calculated values
-            emit(
-              QuizLoaded(
-                questions: questions,
-                originalQuizzes: originalQuizzes,
-                totalAttempted: attemptedCountFromQuiz,
-                totalPossibleMarks: questions.length,
-                marksEarned: 0,
-                percentage: 0.0,
-                remainingQuestions: remainingCountFromQuiz,
-                totalQuestionsFromApi: questions.length,
-              ),
-            );
-          }
-        } else {
-          emit(QuizInitial());
-        }
-      } else {
-        emit(QuizError(message: response.message));
-      }
-    } catch (e) {
-      emit(QuizError(message: e.toString()));
+    debugPrint('🔄 [QUIZ CUBIT] Refreshing score for bookId: $bookId');
+    if (_currentBookId != null) {
+      await loadQuizzesFromApi(bookId: _currentBookId!);
     }
   }
 
   Future<void> resetBookAnswers(String bookId) async {
-    // Remember current book id
     _currentBookId = bookId;
-
-    // Clear local tracking of answered questions
-    _answeredQuestionIds.clear();
+    debugPrint('🔄 [QUIZ CUBIT] Resetting quiz for bookId: $bookId');
 
     // Show resetting loader
     if (state is QuizLoaded) {
@@ -886,90 +518,24 @@ class QuizCubit extends Cubit<QuizState> {
     }
 
     try {
-      // 1) Call reset API to clear current quiz data
+      // Call reset API
       await _repository.resetAnswers(bookId: bookId);
+      debugPrint('✅ [QUIZ CUBIT] Reset API call successful');
 
-      // 2) Force reload quiz data after reset (bypass completion checks)
-      await _loadQuizzesFromApiAfterReset(bookId: bookId);
-    } catch (e) {
-      // Handle API errors appropriately by surfacing an error state
-      final message = e.toString();
-      // Ensure loader is hidden before emitting error
+      // Reload fresh quiz data after reset
+      await loadQuizzesFromApi(bookId: bookId);
+
+      // Hide loader
       final s = state;
       if (s is QuizLoaded) {
         emit(s.copyWith(isResetting: false));
       }
-      emit(QuizError(message: message));
-      return;
-    }
-
-    // 6) Maintain consistent state throughout the reset process
-    // Hide resetting loader when done
-    final s = state;
-    if (s is QuizLoaded) {
-      emit(s.copyWith(isResetting: false));
-    }
-  }
-
-  Future<void> _loadQuizzesFromApiAfterReset({required String bookId}) async {
-    // Remember current book id
-    _currentBookId = bookId;
-
-    emit(QuizLoading());
-
-    try {
-      final response = await _repository.getBookQuizzes(bookId: bookId);
-
-      if (response.status == 200 && response.data != null) {
-        final questions = <QuizQuestion>[];
-        final originalQuizzes =
-            response.data!.quizzes; // Store original quiz data
-
-        // After reset, all questions should be unattempted, so load all of them
-        for (final quiz in originalQuizzes) {
-          final question = QuizQuestion(
-            id: quiz.quizId,
-            question: quiz.question,
-            options: _parseQuizOptions(quiz),
-            // Normalize to 'option#' style to match our selectedOption ids
-            correctAnswerId: _normalizeToOptionKey(quiz.correctOption),
-          );
-          questions.add(question);
-        }
-
-        if (questions.isNotEmpty) {
-          // After reset, all questions should be unattempted, so use quiz API data directly
-          final attemptedCount =
-              originalQuizzes.where((quiz) => quiz.isAttempted).length;
-          final remainingCount =
-              originalQuizzes.where((quiz) => !quiz.isAttempted).length;
-
-          print(
-            'Cubit State After Reset: remainingQuestions=$remainingCount, totalQuestionsFromApi=${questions.length}, totalAttempted=$attemptedCount, questions.length=${questions.length}',
-          );
-
-          // After reset, use quiz API data directly (don't rely on score API which might be stale)
-          emit(
-            QuizLoaded(
-              questions: questions,
-              originalQuizzes: originalQuizzes,
-              totalAttempted:
-                  attemptedCount, // Use calculated value from quiz API
-              totalPossibleMarks: questions.length,
-              marksEarned: 0, // Reset to 0 after reset
-              percentage: 0.0, // Reset to 0 after reset
-              remainingQuestions:
-                  remainingCount, // Use calculated value from quiz API
-              totalQuestionsFromApi: questions.length,
-            ),
-          );
-        } else {
-          emit(QuizInitial());
-        }
-      } else {
-        emit(QuizError(message: response.message));
-      }
     } catch (e) {
+      debugPrint('❌ [QUIZ CUBIT] Reset error: $e');
+      final s = state;
+      if (s is QuizLoaded) {
+        emit(s.copyWith(isResetting: false));
+      }
       emit(QuizError(message: e.toString()));
     }
   }
@@ -1022,8 +588,7 @@ class QuizCubit extends Cubit<QuizState> {
   }
 
   void restartQuiz() {
-    // Clear local tracking of answered questions
-    _answeredQuestionIds.clear();
+    debugPrint('🔄 [QUIZ CUBIT] Restarting quiz');
     emit(QuizInitial());
   }
 }

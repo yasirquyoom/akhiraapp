@@ -16,9 +16,13 @@ class QuizRepository {
     try {
       final queryParams = <String, dynamic>{'skip': skip, 'limit': limit};
 
+      // Disable cache to always fetch fresh quiz data
+      final options = Options(extra: {'disableCache': true});
+
       final response = await _dioClient.get(
         Endpoints.bookQuizzes(bookId),
         queryParameters: queryParams,
+        options: options,
       );
 
       return QuizResponse.fromJson(response.data!);
@@ -51,7 +55,9 @@ class QuizRepository {
   }
 
   Future<Response> getScore({required String bookId}) {
-    return _dioClient.get(Endpoints.quizScore(bookId));
+    // Disable cache to always fetch fresh score data
+    final options = Options(extra: {'disableCache': true});
+    return _dioClient.get(Endpoints.quizScore(bookId), options: options);
   }
 
   Future<Response> resetAnswers({required String bookId}) {
