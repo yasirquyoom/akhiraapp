@@ -2541,29 +2541,40 @@ class _BookContentPageState extends State<BookContentPage>
           );
 
           if (videoContents.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.video_library, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No Video Content Available',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey[700],
+            // Only show empty state if we've confirmed there's no content
+            // Don't show it during transient empty states while loading
+            if (!_hasShownEmpty('video')) {
+              _markEmptyShown('video');
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.video_library, size: 64.sp, color: Colors.grey),
+                    SizedBox(height: 16.h),
+                    Text(
+                      'No Video Content Available',
+                      style: TextStyle(
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[700],
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    'This book doesn\'t have any video content',
-                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            );
+                    SizedBox(height: 8.h),
+                    Text(
+                      'This book doesn\'t have any video content',
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              // Don't show empty state again - content is loading from cache
+              return const SizedBox.shrink();
+            }
           }
 
           debugPrint(
