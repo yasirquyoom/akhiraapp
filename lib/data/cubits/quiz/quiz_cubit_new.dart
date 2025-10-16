@@ -146,6 +146,10 @@ class QuizLoaded extends QuizState {
   int get totalQuestions => questions.length;
   int get correctAnswers => answers.where((answer) => answer.isCorrect).length;
 
+  // Calculate actual current question number based on total progress
+  // e.g., if 2 questions attempted out of 5, current question is 3
+  int get actualCurrentQuestionNumber => totalAttempted + 1;
+
   @override
   List<Object?> get props => [
     questions,

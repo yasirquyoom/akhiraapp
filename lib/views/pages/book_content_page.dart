@@ -2122,7 +2122,7 @@ class _BookContentPageState extends State<BookContentPage>
                           child: Column(
                             children: [
                               Text(
-                                '${state.currentQuestionIndex + 1}/${state.totalQuestionsFromApi > 0 ? state.totalQuestionsFromApi : state.questions.length}',
+                                '${state.actualCurrentQuestionNumber}/${state.totalQuestionsFromApi}',
                                 style: TextStyle(
                                   fontFamily: 'SFPro',
                                   fontWeight: FontWeight.w700,
