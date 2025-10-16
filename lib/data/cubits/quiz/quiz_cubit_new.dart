@@ -245,11 +245,19 @@ class QuizCubit extends Cubit<QuizState> {
     }
   }
 
-  Future<void> loadQuizzesFromApi({required String bookId}) async {
+  Future<void> loadQuizzesFromApi({
+    required String bookId,
+    bool isRefresh = false,
+  }) async {
     _currentBookId = bookId;
-    debugPrint('📚 [QUIZ CUBIT] Loading quizzes for bookId: $bookId');
+    debugPrint(
+      '📚 [QUIZ CUBIT] Loading quizzes for bookId: $bookId (isRefresh: $isRefresh)',
+    );
 
-    emit(QuizLoading());
+    // Only show loading state on initial load, not on refresh
+    if (!isRefresh) {
+      emit(QuizLoading());
+    }
 
     try {
       // Always fetch fresh quiz data - no caching
@@ -421,9 +429,12 @@ class QuizCubit extends Cubit<QuizState> {
           debugPrint('   - Response: $responseData');
 
           if (status == 201 || status == 200) {
-            // Submission successful - fetch fresh data
+            // Submission successful - fetch fresh data (isRefresh: true keeps questions visible)
             if (_currentBookId != null) {
-              await loadQuizzesFromApi(bookId: _currentBookId!);
+              await loadQuizzesFromApi(
+                bookId: _currentBookId!,
+                isRefresh: true,
+              );
             }
 
             // Move to first question (which will be the next unattempted one)
@@ -478,9 +489,12 @@ class QuizCubit extends Cubit<QuizState> {
           );
 
           if (status == 201 || status == 200) {
-            // Fetch fresh data
+            // Fetch fresh data (isRefresh: true keeps questions visible)
             if (_currentBookId != null) {
-              await loadQuizzesFromApi(bookId: _currentBookId!);
+              await loadQuizzesFromApi(
+                bookId: _currentBookId!,
+                isRefresh: true,
+              );
             }
 
             // Move to first question
@@ -508,7 +522,7 @@ class QuizCubit extends Cubit<QuizState> {
   Future<void> refreshBookScore(String bookId) async {
     debugPrint('🔄 [QUIZ CUBIT] Refreshing score for bookId: $bookId');
     if (_currentBookId != null) {
-      await loadQuizzesFromApi(bookId: _currentBookId!);
+      await loadQuizzesFromApi(bookId: _currentBookId!, isRefresh: true);
     }
   }
 

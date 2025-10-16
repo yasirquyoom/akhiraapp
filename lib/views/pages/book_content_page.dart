@@ -18,6 +18,7 @@ import '../../data/cubits/book/book_state.dart';
 import '../../data/cubits/book_content/book_content_state.dart';
 import '../../router/app_router.dart';
 import '../../widgets/language_toggle.dart';
+import '../../widgets/quiz_shimmer.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:dio/dio.dart';
 import '../../services/pdf_cache_service.dart';
@@ -1663,29 +1664,7 @@ class _BookContentPageState extends State<BookContentPage>
     return BlocBuilder<QuizCubit, QuizState>(
       builder: (context, state) {
         if (state is QuizLoading) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.quiz_outlined, size: 64.sp, color: Colors.grey),
-                SizedBox(height: 16.h),
-                Text(
-                  'No Quiz Content Available',
-                  style: TextStyle(
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
-                  ),
-                ),
-                SizedBox(height: 8.h),
-                Text(
-                  'If quizzes exist, they will appear shortly',
-                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
+          return const QuizShimmer(fullShimmer: true);
         } else if (state is QuizLoaded) {
           final totalQuestions =
               state.totalQuestionsFromApi > 0
@@ -2064,152 +2043,172 @@ class _BookContentPageState extends State<BookContentPage>
               //   },
               //   child: Icon(Icons.reset_tv),
               // ),
-              // // Score and Progress Card
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(30.w),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [AppColors.primary, AppColors.primaryGradientEnd],
+              // Show full shimmer when resetting, otherwise show colored card
+              if (state.isResetting)
+                const QuizShimmer(fullShimmer: true)
+              else
+                // Score and Progress Card (always visible with colored background)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(30.w),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.primary, AppColors.primaryGradientEnd],
+                    ),
+                    borderRadius: BorderRadius.circular(16.r),
                   ),
-                  borderRadius: BorderRadius.circular(16.r),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          // Score
+                          Expanded(
+                            child: Column(
+                              children: [
+                                if (state.isSubmitting)
+                                  const QuizShimmer()
+                                else
+                                  Text(
+                                    '${state.marksEarned}',
+                                    style: TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 32.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                SizedBox(height: 8.h),
+                                Text(
+                                  _languageManager.getText(
+                                    'Marks Earned',
+                                    'Points obtenus',
+                                  ),
+                                  style: TextStyle(
+                                    fontFamily: 'SFPro',
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14.sp,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Divider
+                          Container(
+                            width: 5,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                          ),
+                          // Question Progress
+                          Expanded(
+                            child: Column(
+                              children: [
+                                if (state.isSubmitting)
+                                  const QuizShimmer()
+                                else
+                                  Text(
+                                    '${state.actualCurrentQuestionNumber}/${state.totalQuestionsFromApi}',
+                                    style: TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 32.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                SizedBox(height: 8.h),
+                                Text(
+                                  _languageManager.getText(
+                                    'Current Question',
+                                    'Question actuelle',
+                                  ),
+                                  style: TextStyle(
+                                    fontFamily: 'SFPro',
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 14.sp,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12.h),
+                      // Additional live metrics
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              children: [
+                                if (state.isSubmitting)
+                                  QuizShimmer().buildSmallNumberShimmer()
+                                else
+                                  Text(
+                                    '${state.percentage.toStringAsFixed(0)}%',
+                                    style: TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 24.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                SizedBox(height: 8.h),
+                                Text(
+                                  _languageManager.getText(
+                                    'Percentage',
+                                    'Pourcentage',
+                                  ),
+                                  style: TextStyle(
+                                    fontFamily: 'SFPro',
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12.sp,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                if (state.isSubmitting)
+                                  QuizShimmer().buildSmallNumberShimmer()
+                                else
+                                  Text(
+                                    '${state.remainingQuestions}',
+                                    style: TextStyle(
+                                      fontFamily: 'SFPro',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 24.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                SizedBox(height: 8.h),
+                                Text(
+                                  _languageManager.getText(
+                                    'Remaining Questions',
+                                    'Questions restantes',
+                                  ),
+                                  style: TextStyle(
+                                    fontFamily: 'SFPro',
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 12.sp,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        // Score
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(
-                                '${state.marksEarned}',
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 32.sp,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                _languageManager.getText(
-                                  'Marks Earned',
-                                  'Points obtenus',
-                                ),
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14.sp,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        // Divider
-                        Container(
-                          width: 5,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10.r),
-                          ),
-                        ),
-                        // Question Progress
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(
-                                '${state.actualCurrentQuestionNumber}/${state.totalQuestionsFromApi}',
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 32.sp,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                _languageManager.getText(
-                                  'Current Question',
-                                  'Question actuelle',
-                                ),
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14.sp,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 12.h),
-                    // Additional live metrics
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(
-                                '${state.percentage.toStringAsFixed(0)}%',
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 24.sp,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                _languageManager.getText(
-                                  'Percentage',
-                                  'Pourcentage',
-                                ),
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 12.sp,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(
-                                '${state.remainingQuestions}',
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 24.sp,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                _languageManager.getText(
-                                  'Remaining Questions',
-                                  'Questions restantes',
-                                ),
-                                style: TextStyle(
-                                  fontFamily: 'SFPro',
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 12.sp,
-                                  color: Colors.white70,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
 
               SizedBox(height: 24.h),
 
